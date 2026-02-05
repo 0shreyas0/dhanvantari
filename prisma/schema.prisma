@@ -1,0 +1,61 @@
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 1. Medicines: The core product definitions
+model Medicine {
+  id              String   @id @default(uuid())
+  name            String
+  bercode         String   @unique // The globally unique barcode for this medicine type
+  description     String?
+  category        String?  // e.g. "Antibiotics", "Painkillers"
+  
+  lowStockThreshold Int    @default(10) // For alerts
+  
+  // Relations
+  batches         Batch[]
+  preferredVendorId String?
+  preferredVendor   Vendor? @relation(fields: [preferredVendorId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// 2. Batches: Specific stock entries (Expiry tracking happens here!)
+model Batch {
+  id            String   @id @default(uuid())
+  medicineId    String
+  medicine      Medicine @relation(fields: [medicineId], references: [id])
+  
+  batchNumber   String   // Printed on the box
+  quantity      Int      // Current stock for THIS batch
+  
+  costPrice     Float    // Buying price per unit
+  sellingPrice  Float    // Selling price per unit
+  
+  expiryDate    DateTime
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// 3. Vendors: Suppliers for re-ordering
+model Vendor {
+  id          String     @id @default(uuid())
+  name        String
+  contactName String?
+  phone       String?
+  email       String?
+  
+  medicines   Medicine[]
+  
+  createdAt   DateTime   @default(now())
+}
