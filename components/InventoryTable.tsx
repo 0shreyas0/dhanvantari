@@ -49,7 +49,7 @@ export default function InventoryTable() {
                       variant="outline" 
                       className={`
                         ${med.stock === 0 ? 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20' : 
-                          med.stock < 50 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' : 
+                          med.stock < 50 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20' : 
                           'bg-success/10 text-success border-success/20 hover:bg-success/20'}
                       `}
                     >
