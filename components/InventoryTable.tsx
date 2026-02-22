@@ -1,4 +1,6 @@
+"use client"
 
+import { useState } from "react"
 import {
   Table,
   TableBody,
@@ -9,26 +11,71 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
+import { PrintBarcodeButton } from "@/components/PrintBarcodeButton"
 
-export default function InventoryTable() {
-    // Basic mock data
-    const medicines = [
-        { id: 1, name: "Amoxicillin 500mg", barcode: "8901234567890", batch: "BATCH001", stock: 124, price: 12.50, status: "In Stock" },
-        { id: 2, name: "Paracetamol 650mg", barcode: "8909876543210", batch: "BATCH002", stock: 45, price: 5.00, status: "Low Stock" },
-        { id: 3, name: "Cetirizine 10mg",   barcode: "8901122334455", batch: "BATCH003", stock: 200, price: 3.50, status: "In Stock" },
-        { id: 4, name: "Ibuprofen 400mg",   barcode: "8905566778899", batch: "BATCH004", stock: 0, price: 8.00, status: "Out of Stock" },
-    ];
+interface Product {
+  id: string; 
+  name: string;
+  barcode: string;
+  batch: string;
+  stock: number;
+  price: number;
+  status: string;
+}
+
+interface InventoryTableProps {
+  data: Product[];
+}
+
+export default function InventoryTable({ data }: InventoryTableProps) {
+    const [searchQuery, setSearchQuery] = useState("")
+    const [statusFilter, setStatusFilter] = useState("all")
+
+    const filteredData = data.filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                            product.barcode.includes(searchQuery)
+      const matchesStatus = statusFilter === "all" || product.status === statusFilter
+      
+      return matchesSearch && matchesStatus
+    })
 
     return (
-      <Card>
-        <CardHeader className="border-b border-border">
-          <CardTitle>Current Inventory</CardTitle>
+      <Card className="border-border/40 shadow-sm">
+        <CardHeader className="border-b border-border/40 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-medium">Inventory List</CardTitle>
+            <div className="flex gap-4">
+                <div className="relative w-64">
+                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Search products..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-9"
+                    />
+                </div>
+                <div className="relative">
+                    <select 
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="h-9 w-[180px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <option value="all">All Status</option>
+                        <option value="In Stock">In Stock</option>
+                        <option value="Low Stock">Low Stock</option>
+                        <option value="Out of Stock">Out of Stock</option>
+                    </select>
+                </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Medicine Name</TableHead>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-[300px]">Medicine Name</TableHead>
                 <TableHead>Barcode</TableHead>
                 <TableHead>Batch No</TableHead>
                 <TableHead>Stock</TableHead>
@@ -37,27 +84,40 @@ export default function InventoryTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {medicines.map((med) => (
-                <TableRow key={med.id}>
-                  <TableCell className="font-medium">{med.name}</TableCell>
-                  <TableCell className="font-mono text-xs">{med.barcode}</TableCell>
-                  <TableCell>{med.batch}</TableCell>
-                  <TableCell>{med.stock}</TableCell>
-                  <TableCell>${med.price.toFixed(2)}</TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={`
-                        ${med.stock === 0 ? 'bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20' : 
-                          med.stock < 50 ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20' : 
-                          'bg-success/10 text-success border-success/20 hover:bg-success/20'}
-                      `}
-                    >
-                      {med.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredData.length > 0 ? (
+                filteredData.map((med) => (
+                    <TableRow key={med.id} className="hover:bg-muted/50 transition-colors">
+                    <TableCell className="font-medium">{med.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                            {med.barcode}
+                            <PrintBarcodeButton medicineName={med.name} barcode={med.barcode} price={med.price} />
+                        </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{med.batch}</TableCell>
+                    <TableCell>{med.stock}</TableCell>
+                    <TableCell>₹{med.price.toFixed(2)}</TableCell>
+                    <TableCell>
+                        <Badge 
+                        variant="outline" 
+                        className={`
+                            ${med.status === 'Out of Stock' ? 'bg-destructive/10 text-destructive border-destructive/20' : 
+                            med.status === 'Low Stock' ? 'bg-orange-500/10 text-orange-600 border-orange-200 dark:text-orange-400 dark:border-orange-500/20' : 
+                            'bg-green-500/10 text-green-600 border-green-200 dark:text-green-400 dark:border-green-500/20'}
+                        `}
+                        >
+                        {med.status}
+                        </Badge>
+                    </TableCell>
+                    </TableRow>
+                ))
+              ) : (
+                  <TableRow>
+                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                          No products found.
+                      </TableCell>
+                  </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

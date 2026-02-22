@@ -25,9 +25,14 @@ const googleSans = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Pharmacy Inventory System",
+  title: "Dhanvantari",
   description: "Simple inventory management for pharmacies",
+  icons: {
+    icon: "/logo.png",
+  },
 };
+
+import { ClerkProvider } from "@clerk/nextjs";
 
 export default function RootLayout({
   children,
@@ -35,11 +40,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${googleSans.variable} antialiased font-sans`}
-      >
-        <ThemeProvider
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body
+          className={`${googleSans.variable} antialiased font-sans`}
+        >
+          <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
@@ -47,7 +53,8 @@ export default function RootLayout({
           >
             {children}
           </ThemeProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
