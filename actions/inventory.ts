@@ -2,30 +2,25 @@
 
 import { prisma } from "@/lib/prisma"
 import { auth } from "@clerk/nextjs/server"
+import Fuse from "fuse.js"
 
 export async function searchProducts(query: string) {
   if (!query) return []
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
 
+  // Fetch all medicines for this user to perform an e-commerce style fuzzy search Memory-side.
+  // Extremely fast for thousands of SKUs.
   const medicines = await prisma.medicine.findMany({
-    where: {
-      userId,
-      OR: [
-        { name: { contains: query } },
-        { barcode: { contains: query } }
-      ]
-    },
-    include: {
-      batches: true
-    }
+    where: { userId },
+    include: { batches: true }
   })
 
   const now = new Date()
   const thirtyDaysFromNow = new Date()
   thirtyDaysFromNow.setDate(now.getDate() + 30)
 
-  return medicines.map(med => {
+  const formattedMedicines = medicines.map(med => {
     const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0)
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     
@@ -59,6 +54,21 @@ export async function searchProducts(query: string) {
       isExpiringSoon
     }
   })
+
+  // Initialize powerful Fuzzy Search algorithm
+  const fuse = new Fuse(formattedMedicines, {
+    keys: [
+        { name: 'name', weight: 0.7 }, // Prioritize matching the name
+        { name: 'barcode', weight: 0.3 } // Still allow barcode searches
+    ],
+    threshold: 0.4, // Allows for a moderate level of typos (0.0 is perfect match, 1.0 is everything matches)
+    includeScore: true,
+    distance: 100, // How far the typo can be from the start
+  })
+
+  // Search and return top 15 results
+  const searchResults = fuse.search(query);
+  return searchResults.map(result => result.item).slice(0, 15);
 }
 
 export async function getMedicineByBarcode(barcode: string) {
@@ -73,7 +83,10 @@ export async function getMedicineByBarcode(barcode: string) {
   })
 }
 
-export async function processBill(items: { medicineId: string, quantity: number, price: number }[]) {
+export async function processBill(
+  items: { medicineId: string, quantity: number, price: number }[],
+  customer?: { name?: string, phone?: string }
+) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
 
@@ -88,8 +101,11 @@ export async function processBill(items: { medicineId: string, quantity: number,
     
     for (const batch of batches) {
       if (checkQty <= 0) break
+      if (batch.isRecalled) {
+        return { success: false, error: "SAFETY LOCK: Attempted to sell a RECALLED batch." }
+      }
       if (batch.expiryDate < now) {
-        return { success: false, error: "SAFETY LOCK: Attempted to sell an expired batch." }
+        return { success: false, error: "SAFETY LOCK: Attempted to sell an EXPIRED batch." }
       }
       checkQty -= batch.quantity
     }
@@ -100,6 +116,8 @@ export async function processBill(items: { medicineId: string, quantity: number,
   const bill = await prisma.bill.create({
     data: {
       userId,
+      customerName: customer?.name || null,
+      customerPhone: customer?.phone || null,
       totalAmount,
       items: {
         create: items.map(item => ({
@@ -124,6 +142,18 @@ export async function processBill(items: { medicineId: string, quantity: number,
 
       const deduct = Math.min(batch.quantity, remainingToDeduct)
       
+      const serialsToDispense = await prisma.serialNumber.findMany({
+        where: { batchId: batch.id, status: 'ACTIVE' },
+        take: deduct
+      })
+
+      if (serialsToDispense.length > 0) {
+        await prisma.serialNumber.updateMany({
+          where: { id: { in: serialsToDispense.map(s => s.id) } },
+          data: { status: 'DISPENSED', dispensedAt: new Date() }
+        })
+      }
+
       await prisma.batch.update({
         where: { id: batch.id },
         data: { quantity: batch.quantity - deduct }
@@ -193,6 +223,11 @@ export async function createMedicine(data: {
         costPrice: initialBatch.costPrice,
         sellingPrice: initialBatch.sellingPrice,
         expiryDate: initialBatch.expiryDate,
+        serialNumbers: {
+            create: Array.from({ length: initialBatch.quantity }).map(() => ({
+                code: crypto.randomUUID()
+            }))
+        }
       }
     })
 
@@ -200,4 +235,26 @@ export async function createMedicine(data: {
   })
 
   return { success: true, medicine: result }
+}
+
+export async function toggleRecallBatch(batchId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const batch = await prisma.batch.findUnique({
+    where: { id: batchId },
+    include: { medicine: true }
+  })
+
+  // Ensure user owns this medicine
+  if (!batch || batch.medicine.userId !== userId) {
+    throw new Error("Unauthorized or Batch Not Found")
+  }
+
+  const updatedBatch = await prisma.batch.update({
+    where: { id: batchId },
+    data: { isRecalled: !batch.isRecalled }
+  })
+
+  return { success: true, isRecalled: updatedBatch.isRecalled }
 }

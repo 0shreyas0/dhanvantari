@@ -46,8 +46,23 @@ model Batch {
 
   expiryDate DateTime
 
+  isRecalled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  serialNumbers SerialNumber[]
+}
+
+// 2b. Serial Numbers: Track individual medicine units for true Track-and-Trace
+model SerialNumber {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  batchId     String
+  status      String    @default("ACTIVE") // ACTIVE, DISPENSED, DESTROYED
+  dispensedAt DateTime?
+
+  batch Batch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 }
 
 // 3. Vendors: Suppliers for re-ordering
@@ -66,8 +81,12 @@ model Vendor {
 
 // 4. Billing
 model Bill {
-  id          String     @id @default(uuid())
-  userId      String // Maps to Clerk User ID
+  id     String @id @default(uuid())
+  userId String // Maps to Clerk User ID
+
+  customerName  String?
+  customerPhone String?
+
   items       BillItem[]
   totalAmount Float
 
@@ -84,4 +103,16 @@ model BillItem {
 
   quantity Int
   price    Float // Price at moment of sale
+}
+
+// 5. Pharmacy Settings
+model PharmacySettings {
+  id      String  @id @default(uuid())
+  userId  String  @unique
+  name    String  @default("My Pharmacy")
+  phone   String?
+  address String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

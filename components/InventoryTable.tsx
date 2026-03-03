@@ -12,8 +12,10 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Search } from "lucide-react"
+import { Search, AlertTriangle } from "lucide-react"
 import { PrintBarcodeButton } from "@/components/PrintBarcodeButton"
+import { toggleRecallBatch } from "@/actions/inventory"
+import { useRouter } from "next/navigation"
 
 interface Product {
   id: string; 
@@ -23,15 +25,26 @@ interface Product {
   stock: number;
   price: number;
   status: string;
+  rawBatches?: any[];
 }
 
 interface InventoryTableProps {
   data: Product[];
+  pharmacyName: string;
 }
 
-export default function InventoryTable({ data }: InventoryTableProps) {
+export default function InventoryTable({ data, pharmacyName }: InventoryTableProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [statusFilter, setStatusFilter] = useState("all")
+    const router = useRouter()
+    
+    const handleToggleRecall = async (batchId: string) => {
+        if (!confirm("Are you sure you want to toggle the recall status for this batch? This will freeze its sales availability.")) {
+            return;
+        }
+        await toggleRecallBatch(batchId);
+        router.refresh();
+    }
 
     const filteredData = data.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -66,6 +79,7 @@ export default function InventoryTable({ data }: InventoryTableProps) {
                         <option value="In Stock">In Stock</option>
                         <option value="Low Stock">Low Stock</option>
                         <option value="Out of Stock">Out of Stock</option>
+                        <option value="Recalled">Recalled</option>
                     </select>
                 </div>
             </div>
@@ -89,9 +103,26 @@ export default function InventoryTable({ data }: InventoryTableProps) {
                     <TableRow key={med.id} className="hover:bg-muted/50 transition-colors">
                     <TableCell className="font-medium">{med.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                             {med.barcode}
-                            <PrintBarcodeButton medicineName={med.name} barcode={med.barcode} price={med.price} />
+                            <div className="ml-2 flex items-center">
+                                <PrintBarcodeButton 
+                                  pharmacyName={pharmacyName}
+                                  medicineName={med.name} 
+                                  barcode={med.barcode} 
+                                  price={med.price} 
+                                  batch={med.batch} 
+                                />
+                                {med.rawBatches && med.rawBatches.length > 0 && (
+                                  <button 
+                                      onClick={() => handleToggleRecall(med.rawBatches![0].id)}
+                                      className={`ml-1 p-1 rounded hover:bg-muted ${med.status === 'Recalled' ? 'text-red-500' : 'text-muted-foreground'}`}
+                                      title={med.status === 'Recalled' ? 'Un-Recall First Batch' : 'Recall First Batch'}
+                                  >
+                                      <AlertTriangle className="h-4 w-4" />
+                                  </button>
+                                )}
+                            </div>
                         </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{med.batch}</TableCell>
@@ -101,7 +132,8 @@ export default function InventoryTable({ data }: InventoryTableProps) {
                         <Badge 
                         variant="outline" 
                         className={`
-                            ${med.status === 'Out of Stock' ? 'bg-destructive/10 text-destructive border-destructive/20' : 
+                            ${med.status === 'Recalled' ? 'bg-red-500/20 text-red-700 border-red-500 dark:text-red-400 font-bold' :
+                            med.status === 'Out of Stock' ? 'bg-destructive/10 text-destructive border-destructive/20' : 
                             med.status === 'Low Stock' ? 'bg-orange-500/10 text-orange-600 border-orange-200 dark:text-orange-400 dark:border-orange-500/20' : 
                             'bg-green-500/10 text-green-600 border-green-200 dark:text-green-400 dark:border-green-500/20'}
                         `}

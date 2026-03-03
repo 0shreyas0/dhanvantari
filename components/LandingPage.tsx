@@ -2,19 +2,30 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ShieldCheck, Zap, BarChart3, Pill } from "lucide-react";
 import { ThemeProvider } from "@/components/theme-provider";
+import Image from "next/image";
+import { WipeToggler } from "./WipeToggler";
 
 export default function LandingPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
         <div className="container flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Pill className="h-5 w-5 text-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-sm shadow-primary/20">
+              <Image 
+                src="/logo.png" 
+                alt="Dhanvantari Logo" 
+                fill
+                className="object-cover"
+              />
             </div>
-            <span className="text-xl font-bold tracking-tight">Pharmacy OS</span>
+            <div className="flex flex-col justify-center">
+              <h1 className="text-lg font-bold tracking-tight text-foreground leading-tight">Dhanvantari</h1>
+              <p className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground leading-tight">Inventory System</p>
+            </div>
           </div>
           <div className="flex items-center gap-4">
+            <WipeToggler />
             <Link href="/sign-in">
               <Button variant="ghost" size="sm">
                 Sign In

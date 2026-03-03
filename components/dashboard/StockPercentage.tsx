@@ -21,7 +21,7 @@ export default function StockPercentage({ percentage }: StockPercentageProps) {
 
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-card border border-border rounded-xl shadow-sm">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Stock Health</h3>
+      <h3 className="text-lg font-semibold text-foreground mb-4">Catalog Availability</h3>
       <div className="h-48 w-48 relative flex items-center justify-center">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -47,7 +47,7 @@ export default function StockPercentage({ percentage }: StockPercentageProps) {
         </div>
       </div>
       <p className="text-sm text-muted-foreground mt-4 text-center">
-        Overall Inventory Status
+        % of unique SKUs adequately stocked
       </p>
     </div>
   )

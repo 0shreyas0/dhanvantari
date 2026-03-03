@@ -12,28 +12,42 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
   useEffect(() => {
-    // Initialize scanner
-    // Note: html5-qrcode attaches to an element ID.
-    const config = { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-    };
-    
-    // We need to ensure the element exists before initializing
-    const scanner = new Html5QrcodeScanner(
-      "reader",
-      config,
-      /* verbose= */ false
-    );
-    
-    scanner.render(onScanSuccess, onScanFailure);
-    scannerRef.current = scanner;
+    let isComponentMounted = true;
+
+    // Slight delay to let Strict Mode finish its instant unmount/remount cycle.
+    const initTimer = setTimeout(() => {
+        if (!isComponentMounted) return;
+
+        // Only initialize if we haven't already
+        if (!scannerRef.current) {
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 },
+                aspectRatio: 1.0
+            };
+            
+            const scanner = new Html5QrcodeScanner(
+              "reader",
+              config,
+              /* verbose= */ false
+            );
+            
+            scanner.render(onScanSuccess, onScanFailure);
+            scannerRef.current = scanner;
+        }
+    }, 100);
 
     return () => {
+      isComponentMounted = false;
+      clearTimeout(initTimer);
+      // In React Strict Mode, destruction happens immediately, but we must
+      // ensure we only clear if it exists to avoid errors.
       if (scannerRef.current) {
         try {
-            scannerRef.current.clear().catch(error => {
+            // Need to set it to null *before* clear finishes to prevent racing conditions in Strict Mode
+            const scanner = scannerRef.current;
+            scannerRef.current = null;
+            scanner.clear().catch(error => {
                 console.error("Failed to clear html5-qrcode scanner. ", error);
             });
         } catch (e) {
@@ -41,7 +55,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         }
       }
     };
-  }, [onScanSuccess, onScanFailure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="w-full max-w-md mx-auto overflow-hidden rounded-xl border border-border bg-card shadow-sm">

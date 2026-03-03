@@ -344,10 +344,3 @@ Include blocks:
 * Express.js Documentation
 * StackOverflow
 * Research papers on retail automation
-
----
-
-If you want, I can also give you:
-
-* What to **say while presenting each slide** (very useful for viva)
-* And also what diagram to draw in Slide 9 (architecture) 👍

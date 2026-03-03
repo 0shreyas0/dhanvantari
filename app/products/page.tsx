@@ -5,6 +5,7 @@ import MainLayout from "@/components/MainLayout";
 import InventoryTable from "@/components/InventoryTable";
 import { redirect } from "next/navigation";
 import { AddProductDialog } from "@/components/AddProductDialog";
+import { getPharmacySettings } from "@/actions/settings";
 
 export default async function ProductsPage() {
   const { userId } = await auth();
@@ -17,12 +18,31 @@ export default async function ProductsPage() {
     }
   });
 
+  const settings = await getPharmacySettings();
+  const pharmacyName = settings?.name || "Pharmacy";
+
   const data = medicines.map(med => {
+    const activeBatches = med.batches.filter(b => !b.isRecalled);
+    const recalledBatches = med.batches.filter(b => b.isRecalled);
+    
+    // Total stock from non-recalled items basically, or just show all but flag it.
     const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0);
-    // Find representative price (first batch or average?) - use first batch for now
-    // If no batches, price is 0
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0; 
+
+    // Find if the entire medicine line is compromised by a recall
+    const hasRecall = recalledBatches.length > 0;
+    
+    // Which batches to show in the pill
     const batches = med.batches.map(b => b.batchNumber).join(", ");
+    
+    let status = "In Stock";
+    if (hasRecall) {
+        status = "Recalled";
+    } else if (stock === 0) {
+        status = "Out of Stock";
+    } else if (stock < med.lowStockThreshold) {
+        status = "Low Stock";
+    }
     
     return {
       id: med.id,
@@ -31,7 +51,10 @@ export default async function ProductsPage() {
       batch: batches || "N/A",
       stock,
       price,
-      status: stock === 0 ? "Out of Stock" : stock < med.lowStockThreshold ? "Low Stock" : "In Stock"
+      status,
+      // Pass the first batch ID randomly or just have a detail view...
+      // For simplicity let's pass the raw batches so InventoryTable can use them.
+      rawBatches: med.batches
     };
   });
 
@@ -45,7 +68,7 @@ export default async function ProductsPage() {
             </div>
             <AddProductDialog />
         </div>
-        <InventoryTable data={data} />
+        <InventoryTable data={data} pharmacyName={pharmacyName} />
       </MainLayout>
     </PageContainer>
   );

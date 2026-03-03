@@ -44,33 +44,49 @@ export function AddProductDialog() {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null)
 
   useEffect(() => {
+    let isComponentMounted = true;
+    let initTimer: NodeJS.Timeout;
+
     if (isScanning && !scannerRef.current) {
-        // Dynamic import to avoid SSR issues with html5-qrcode
-        import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
-            const scanner = new Html5QrcodeScanner(
-                "reader-add-product",
-                { fps: 10, qrbox: { width: 250, height: 250 } },
-                false
-            );
+        initTimer = setTimeout(() => {
+            if (!isComponentMounted) return;
             
-            scanner.render(
-                (decodedText) => {
-                    handleBarcodeFound(decodedText);
-                    setIsScanning(false);
-                    scanner.clear();
-                },
-                (error) => {
-                    console.warn(error);
+            // Dynamic import to avoid SSR issues with html5-qrcode
+            import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
+                if (!isComponentMounted) return; // Unmounted before import finished
+                
+                // Just double check we didn't mount another one
+                if (!scannerRef.current) {
+                    const scanner = new Html5QrcodeScanner(
+                        "reader-add-product",
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        false
+                    );
+                    
+                    scanner.render(
+                        (decodedText) => {
+                            handleBarcodeFound(decodedText);
+                            setIsScanning(false);
+                            scanner.clear();
+                        },
+                        (error) => {
+                            console.warn(error);
+                        }
+                    );
+                    scannerRef.current = scanner;
                 }
-            );
-            scannerRef.current = scanner;
-        });
+            });
+        }, 100); // 100ms debounce to bypass React Strict Mode instant double-render
     }
 
     return () => {
+        isComponentMounted = false;
+        if (initTimer) clearTimeout(initTimer);
+        
         if (scannerRef.current) {
-            scannerRef.current.clear().catch(console.error);
+            const scanner = scannerRef.current;
             scannerRef.current = null;
+            scanner.clear().catch(console.error);
         }
     }
   }, [isScanning]);

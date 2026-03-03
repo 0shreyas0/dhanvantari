@@ -3,15 +3,15 @@
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts"
 
 interface WeightedScoreProps {
+  inStock: number
   lowStock: number
   outOfStock: number
-  arrivingStock: number
 }
 
-export default function WeightedScore({ lowStock, outOfStock, arrivingStock }: WeightedScoreProps) {
+export default function WeightedScore({ inStock, lowStock, outOfStock }: WeightedScoreProps) {
   const data = [
-    { name: "Low stock", value: lowStock, color: "#489BE8" },
-    { name: "Arriving stock", value: arrivingStock, color: "#31D0AA" },
+    { name: "Healthy stock", value: inStock, color: "#31D0AA" },
+    { name: "Low stock", value: lowStock, color: "#fcba03" },
     { name: "Out of stock", value: outOfStock, color: "#E85B81" },
   ]
 
@@ -20,7 +20,7 @@ export default function WeightedScore({ lowStock, outOfStock, arrivingStock }: W
 
   return (
     <div className="flex flex-col items-center justify-center p-6 bg-card border border-border rounded-xl shadow-sm">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Weighted Score</h3>
+      <h3 className="text-lg font-semibold text-foreground mb-4">Product Catalog Breakdown</h3>
       <div className="h-48 w-48 relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

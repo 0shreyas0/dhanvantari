@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BarcodeScanner from "@/components/BarcodeScanner"
 import { searchProducts, processBill } from "@/actions/inventory"
-import { Loader2, Plus, Minus, Trash2, Search } from "lucide-react"
+import { Loader2, Plus, Minus, Trash2, Search, UserCircle } from "lucide-react"
+import { useEffect } from "react"
+import { Label } from "@/components/ui/label"
 
 interface Product {
   id: string
@@ -32,17 +34,33 @@ export default function BillingPage() {
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  
+  // Customer details for checkout
+  const [customerName, setCustomerName] = useState("")
+  const [customerPhone, setCustomerPhone] = useState("")
 
-  const handleApplySearch = async () => {
-    if (!searchQuery) return
+  const handleApplySearch = async (query: string) => {
+    if (!query) {
+        setSearchResults([])
+        return
+    }
     setIsSearching(true)
     try {
-      const results = await searchProducts(searchQuery)
+      const results = await searchProducts(query)
       setSearchResults(results)
     } finally {
       setIsSearching(false)
     }
   }
+
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleApplySearch(searchQuery.trim())
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   const handleScanSuccess = async (decodedText: string) => {
     // Determine if product is already in bill? No, let's fetch first.
@@ -107,9 +125,11 @@ export default function BillingPage() {
         price: item.price
       }))
       
-      const result = await processBill(payload as any) // actions/inventory returns generic object
+      const result = await processBill(payload as any, { name: customerName, phone: customerPhone }) // actions/inventory returns generic object
       if (result.success) {
         setBillItems([])
+        setCustomerName("")
+        setCustomerPhone("")
         alert("Bill processed successfully!")
       } else {
         alert(result.error || "Failed to process bill.")
@@ -190,8 +210,31 @@ export default function BillingPage() {
                   </TableBody>
                 </Table>
               </CardContent>
-              <div className="p-6 bg-muted/20 border-t border-border/40">
-                <div className="flex items-center justify-between mb-4">
+              <div className="p-6 bg-muted/20 border-t border-border/40 space-y-4">
+                <div className="grid grid-cols-2 gap-4 border-b border-border/40 pb-4">
+                  <div>
+                    <Label htmlFor="customerName" className="text-xs text-muted-foreground mb-1.5 block">Customer Name (Optional)</Label>
+                    <Input 
+                      id="customerName"
+                      placeholder="e.g. Rahul Patil"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customerPhone" className="text-xs text-muted-foreground mb-1.5 block">Phone Number (Optional)</Label>
+                    <Input 
+                      id="customerPhone"
+                      placeholder="e.g. 9876543210"
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 mb-4">
                   <span className="text-lg font-medium">Total Amount</span>
                   <span className="text-2xl font-bold">₹{totalAmount.toFixed(2)}</span>
                 </div>
@@ -222,16 +265,16 @@ export default function BillingPage() {
                   </TabsList>
                   
                   <TabsContent value="search" className="space-y-4">
-                    <div className="flex gap-2">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <Search className="h-4 w-4 text-muted-foreground" />}
+                      </div>
                       <Input 
-                        placeholder="Name or Barcode" 
+                        placeholder="Search by name or barcode..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleApplySearch()}
+                        className="pl-9 h-10 w-full"
                       />
-                      <Button onClick={handleApplySearch} disabled={isSearching}>
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                      </Button>
                     </div>
 
                     <div className="space-y-2 max-h-[400px] overflow-auto">
