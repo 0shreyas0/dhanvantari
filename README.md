@@ -1,7 +1,7 @@
 <div align="center">
   
 # ⚕️ Dhanvantari
-### Intelligent Pharmacy Operations System
+### Intelligent Pharmacy Inventory Management System
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.0-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
