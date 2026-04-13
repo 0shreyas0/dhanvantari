@@ -10,7 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BarcodeScanner from "@/components/BarcodeScanner"
 import { searchProducts, processBill, getBillDetails } from "@/actions/inventory"
-import { Loader2, Plus, Minus, Trash2, Search, UserCircle, CheckCircle2, Share2, MessageCircle } from "lucide-react"
+import { sendWhatsAppReceipt } from "@/actions/whatsapp"
+import { Loader2, Plus, Minus, Trash2, Search, UserCircle, CheckCircle2, Share2, MessageCircle, Send } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import {
   Dialog,
@@ -49,6 +50,7 @@ export default function BillingPage() {
   // Success State
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [lastBill, setLastBill] = useState<any>(null)
+  const [isSendingWa, setIsSendingWa] = useState(false)
 
   // Prevention for rapid duplicate scans (2-second cooldown for same barcode)
   const lastScannedRef = useRef<{ code: string, time: number }>({ code: "", time: 0 });
@@ -166,25 +168,38 @@ export default function BillingPage() {
     }
   }
 
-  const handleWhatsAppShare = () => {
-    if (!lastBill) return
+  const handleWhatsAppShare = async () => {
+    if (!lastBill || !lastBill.customerPhone) {
+        alert("Please provide a customer phone number first.")
+        return
+    }
 
-    const itemsList = lastBill.items.map((item: any) => 
-      `• ${item.medicine.name} x ${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}`
-    ).join('\n');
+    setIsSendingWa(true)
+    try {
+      const result = await sendWhatsAppReceipt(
+        lastBill.customerPhone,
+        lastBill.customerName || "Customer",
+        lastBill.id,
+        lastBill.totalAmount,
+        lastBill.items.map((item: any) => ({
+          name: item.medicine.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        lastBill.pharmacyName
+      )
 
-    const text = `*Receipt from ${lastBill.pharmacyName}*\n\n` +
-      `*Customer:* ${lastBill.customerName || 'Valued Customer'}\n` +
-      `*Bill ID:* ${lastBill.id.slice(-6).toUpperCase()}\n` +
-      `*Date:* ${new Date(lastBill.createdAt).toLocaleDateString()}\n\n` +
-      `*Items:*\n${itemsList}\n\n` +
-      `*Total Amount: ₹${lastBill.totalAmount.toFixed(2)}*\n\n` +
-      `Thank you for choosing our pharmacy!`;
-      
-    const encodedText = encodeURIComponent(text);
-    const whatsappUrl = `https://wa.me/${lastBill.customerPhone ? lastBill.customerPhone.replace(/\D/g, '') : ''}?text=${encodedText}`;
-    
-    window.open(whatsappUrl, '_blank');
+      if (result.success) {
+        alert("Bot has sent the message successfully!")
+      } else {
+        alert(`Bot failed: ${result.error}`)
+      }
+    } catch (e) {
+      console.error(e)
+      alert("Failed to trigger Bot.")
+    } finally {
+      setIsSendingWa(false)
+    }
   }
 
   const totalAmount = billItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
@@ -395,10 +410,15 @@ export default function BillingPage() {
               <Button 
                 variant="outline" 
                 className="flex-1 gap-2"
+                disabled={isSendingWa || !lastBill?.customerPhone}
                 onClick={handleWhatsAppShare}
               >
-                <MessageCircle className="h-4 w-4 text-green-600" />
-                Send via WhatsApp
+                {isSendingWa ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <MessageCircle className="h-4 w-4 text-green-600" />
+                )}
+                {isSendingWa ? "Sending..." : "Send via Bot"}
               </Button>
               <Button 
                 variant="default" 
