@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import PageContainer from "@/components/PageContainer"
 import MainLayout from "@/components/MainLayout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,10 +9,17 @@ import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BarcodeScanner from "@/components/BarcodeScanner"
-import { searchProducts, processBill } from "@/actions/inventory"
-import { Loader2, Plus, Minus, Trash2, Search, UserCircle } from "lucide-react"
-import { useEffect } from "react"
+import { searchProducts, processBill, getBillDetails } from "@/actions/inventory"
+import { Loader2, Plus, Minus, Trash2, Search, UserCircle, CheckCircle2, Share2, MessageCircle } from "lucide-react"
 import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 
 interface Product {
   id: string
@@ -39,6 +46,13 @@ export default function BillingPage() {
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
 
+  // Success State
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [lastBill, setLastBill] = useState<any>(null)
+
+  // Prevention for rapid duplicate scans (2-second cooldown for same barcode)
+  const lastScannedRef = useRef<{ code: string, time: number }>({ code: "", time: 0 });
+
   const handleApplySearch = async (query: string) => {
     if (!query) {
         setSearchResults([])
@@ -63,8 +77,14 @@ export default function BillingPage() {
   }, [searchQuery])
 
   const handleScanSuccess = async (decodedText: string) => {
-    // Determine if product is already in bill? No, let's fetch first.
-    // Or fetch solely to get details.
+    // 1. Debounce logic: Ignore if same barcode was scanned in the last 2 seconds
+    const now = Date.now();
+    if (decodedText === lastScannedRef.current.code && (now - lastScannedRef.current.time) < 2000) {
+        return;
+    }
+    lastScannedRef.current = { code: decodedText, time: now };
+
+    // 2. Fetch and add
     setIsSearching(true)
     try {
       const results = await searchProducts(decodedText)
@@ -126,11 +146,15 @@ export default function BillingPage() {
       }))
       
       const result = await processBill(payload as any, { name: customerName, phone: customerPhone }) // actions/inventory returns generic object
-      if (result.success) {
+      if (result.success && result.billId) {
+        // Fetch full bill details for sharing
+        const details = await getBillDetails(result.billId)
+        setLastBill(details)
+        setShowSuccessDialog(true)
+        
         setBillItems([])
         setCustomerName("")
         setCustomerPhone("")
-        alert("Bill processed successfully!")
       } else {
         alert(result.error || "Failed to process bill.")
       }
@@ -140,6 +164,27 @@ export default function BillingPage() {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleWhatsAppShare = () => {
+    if (!lastBill) return
+
+    const itemsList = lastBill.items.map((item: any) => 
+      `• ${item.medicine.name} x ${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}`
+    ).join('\n');
+
+    const text = `*Receipt from ${lastBill.pharmacyName}*\n\n` +
+      `*Customer:* ${lastBill.customerName || 'Valued Customer'}\n` +
+      `*Bill ID:* ${lastBill.id.slice(-6).toUpperCase()}\n` +
+      `*Date:* ${new Date(lastBill.createdAt).toLocaleDateString()}\n\n` +
+      `*Items:*\n${itemsList}\n\n` +
+      `*Total Amount: ₹${lastBill.totalAmount.toFixed(2)}*\n\n` +
+      `Thank you for choosing our pharmacy!`;
+      
+    const encodedText = encodeURIComponent(text);
+    const whatsappUrl = `https://wa.me/${lastBill.customerPhone ? lastBill.customerPhone.replace(/\D/g, '') : ''}?text=${encodedText}`;
+    
+    window.open(whatsappUrl, '_blank');
   }
 
   const totalAmount = billItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
@@ -315,6 +360,56 @@ export default function BillingPage() {
             </Card>
           </div>
         </div>
+
+        {/* Success Dialog */}
+        <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <div className="flex justify-center mb-4">
+                <div className="h-12 w-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <DialogTitle className="text-center text-xl">Bill Generated Successfully!</DialogTitle>
+              <DialogDescription className="text-center">
+                The bill has been saved and inventory has been updated.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="bg-muted/30 p-4 rounded-lg border border-border/50 space-y-2 mt-2">
+               <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Bill ID:</span>
+                  <span className="font-mono font-medium">{lastBill?.id?.slice(-8).toUpperCase()}</span>
+               </div>
+               <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Customer:</span>
+                  <span className="font-medium">{lastBill?.customerName || "Walk-in Customer"}</span>
+               </div>
+               <div className="flex justify-between text-sm pt-2 border-t border-border">
+                  <span className="font-semibold">Total Paid:</span>
+                  <span className="font-bold text-primary text-lg">₹{lastBill?.totalAmount?.toFixed(2)}</span>
+               </div>
+            </div>
+
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                className="flex-1 gap-2"
+                onClick={handleWhatsAppShare}
+              >
+                <MessageCircle className="h-4 w-4 text-green-600" />
+                Send via WhatsApp
+              </Button>
+              <Button 
+                variant="default" 
+                className="flex-1"
+                onClick={() => setShowSuccessDialog(false)}
+              >
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </MainLayout>
     </PageContainer>
   )

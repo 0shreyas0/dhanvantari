@@ -258,3 +258,31 @@ export async function toggleRecallBatch(batchId: string) {
 
   return { success: true, isRecalled: updatedBatch.isRecalled }
 }
+
+export async function getBillDetails(billId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const bill = await prisma.bill.findUnique({
+    where: { id: billId, userId },
+    include: {
+      items: {
+        include: {
+          medicine: true
+        }
+      }
+    }
+  })
+
+  if (!bill) return null
+
+  // Also try to get pharmacy settings for the pharmacy name
+  const settings = await prisma.pharmacySettings.findUnique({
+    where: { userId }
+  })
+
+  return {
+    ...bill,
+    pharmacyName: settings?.name || "Dhanvantari Pharmacy"
+  }
+}
