@@ -77,126 +77,114 @@ export async function GET(
       doc.on("end", resolve)
       doc.on("error", reject)
 
+      // ---- Branded Header Decoration ----
+      doc.rect(0, 0, 595, 8).fillColor("#0f172a").fill()
+
       // ---- Header ----
+      doc.moveDown(2)
       doc
-        .fontSize(22)
+        .fontSize(24)
         .font("ReceiptBold")
-        .text(pharmacyName.toUpperCase(), { align: "center" })
+        .fillColor("#0f172a")
+        .text(pharmacyName.toUpperCase(), { align: "center", characterSpacing: 1 })
+      
       doc
-        .fontSize(10)
-        .font("ReceiptRegular")
-        .fillColor("#555")
-        .text("Official Tax Receipt - Digitized by Dhanvantari", { align: "center" })
-      doc.moveDown()
-
-      // ---- Divider ----
-      doc
-        .moveTo(50, doc.y)
-        .lineTo(545, doc.y)
-        .strokeColor("#cccccc")
-        .stroke()
-      doc.moveDown(0.5)
-
-      // ---- Bill Meta ----
-      const metaY = doc.y
-      doc.font("ReceiptRegular").fontSize(10).fillColor("#333")
-      doc.text(`Bill To: ${bill.customerName || "Valued Customer"}`, 50, metaY)
-      doc.text(`Phone: ${bill.customerPhone || "-"}`, 50)
-      doc
-        .font("ReceiptRegular")
-        .fontSize(10)
-        .text(`Receipt ID: #${bill.id.slice(-8).toUpperCase()}`, 350, metaY, {
-          align: "right",
-          width: 195,
-        })
-      doc.text(
-        `Date: ${new Date(bill.createdAt).toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })}`,
-        350,
-        undefined,
-        { align: "right", width: 195 }
-      )
-
+        .fontSize(9)
+        .font("ReceiptMedium")
+        .fillColor("#64748b")
+        .text("OFFICIAL TAX RECEIPT", { align: "center", characterSpacing: 2 })
+      
       doc.moveDown(1.5)
 
+      // ---- Bill Meta ----
+      // ---- Bill Meta Information Row ----
+      const metaY = doc.y
+      
+      // Left Column: Customer Details
+      doc.font("ReceiptBold").fontSize(8).fillColor("#94a3b8").text("BILL TO", 50, metaY)
+      doc.font("ReceiptBold").fontSize(11).fillColor("#1e293b").text(bill.customerName?.toUpperCase() || "VALUED CUSTOMER", 50, metaY + 12)
+      doc.font("ReceiptRegular").fontSize(10).fillColor("#64748b").text(bill.customerPhone || "—", 50, metaY + 26)
+
+      // Right Column: Receipt Details
+      doc.font("ReceiptBold").fontSize(8).fillColor("#94a3b8").text("RECEIPT DETAILS", 350, metaY, { align: "right", width: 195 })
+      doc.font("ReceiptBold").fontSize(10).fillColor("#1e293b").text(`ID: #${bill.id.slice(-8).toUpperCase()}`, 350, metaY + 12, { align: "right", width: 195 })
+      doc.font("ReceiptRegular").fontSize(10).fillColor("#64748b").text(`Date: ${new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, 350, metaY + 26, { align: "right", width: 195 })
+
+      doc.moveDown(3)
+
       // ---- Items Table Header ----
+      // ---- Items Table ----
       const tableTop = doc.y
-      doc
-        .rect(50, tableTop, 495, 20)
-        .fillColor("#0f172a")
-        .fill()
+      
+      // Table Header Background
+      doc.rect(50, tableTop, 495, 24).fillColor("#1e293b").fill()
 
+      // Table Headers
       doc
-        .fontSize(10)
+        .fontSize(9)
         .font("ReceiptBold")
-        .fillColor("white")
-        .text("Medicine", 60, tableTop + 5, { width: 220 })
-        .text("Qty", 280, tableTop + 5, { width: 70, align: "center" })
-        .text("Unit Price", 350, tableTop + 5, { width: 90, align: "right" })
-        .text("Amount", 440, tableTop + 5, { width: 95, align: "right" })
+        .fillColor("#ffffff")
+        .text("MEDICINE", 65, tableTop + 8, { width: 220 })
+        .text("QTY", 280, tableTop + 8, { width: 70, align: "center" })
+        .text("UNIT PRICE", 350, tableTop + 8, { width: 90, align: "right" })
+        .text("AMOUNT", 440, tableTop + 8, { width: 95, align: "right" })
 
-      // ---- Items ----
-      let rowY = tableTop + 25
-      doc.font("ReceiptRegular").fillColor("#333").fontSize(10)
+      // Render Items
+      let rowY = tableTop + 24
+      doc.font("ReceiptRegular").fontSize(10)
 
       bill.items.forEach((item, i) => {
-        const rowBg = i % 2 === 0 ? "#f8fafc" : "#ffffff"
-        doc.rect(50, rowY, 495, 20).fillColor(rowBg).fill()
+        // Alternating row background
+        if (i % 2 === 0) {
+          doc.rect(50, rowY, 495, 22).fillColor("#f8fafc").fill()
+        }
 
         doc
-          .fillColor("#1e293b")
-          .text(item.medicine.name, 60, rowY + 5, { width: 220 })
-          .text(String(item.quantity), 280, rowY + 5, { width: 70, align: "center" })
-          .text(`\u20b9${item.price.toFixed(2)}`, 350, rowY + 5, { width: 90, align: "right" })
-          .text(`\u20b9${(item.price * item.quantity).toFixed(2)}`, 440, rowY + 5, {
-            width: 95,
-            align: "right",
-          })
+          .fillColor("#334155")
+          .text(item.medicine.name, 65, rowY + 6, { width: 220 })
+          .text(String(item.quantity), 280, rowY + 6, { width: 70, align: "center" })
+          .text(`\u20b9${item.price.toFixed(2)}`, 350, rowY + 6, { width: 90, align: "right" })
+          .text(`\u20b9${(item.price * item.quantity).toFixed(2)}`, 440, rowY + 6, { width: 95, align: "right" })
 
-        rowY += 20
+        rowY += 22
       })
 
-      // ---- Totals ----
-      doc.moveDown(0.5)
-      doc
-        .moveTo(50, rowY + 5)
-        .lineTo(545, rowY + 5)
-        .strokeColor("#e2e8f0")
-        .stroke()
+      // ---- Totals Section ----
+      doc.moveDown(2)
+      const totalsY = doc.y
+      
+      // Summary Box
+      doc.rect(340, totalsY, 205, 85).fillColor("#f1f5f9").fill()
+      
+      let lineY = totalsY + 12
+      doc.font("ReceiptRegular").fontSize(10).fillColor("#64748b")
+      doc.text("Subtotal", 355, lineY).text(`\u20b9${bill.subtotalAmount.toFixed(2)}`, 440, lineY, { align: "right", width: 95 })
+      
+      lineY += 20
+      doc.text(`GST (${bill.gstRate.toFixed(0)}%)`, 355, lineY).text(`\u20b9${bill.gstAmount.toFixed(2)}`, 440, lineY, { align: "right", width: 95 })
+      
+      // Final Total Highlight
+      lineY += 22
+      doc.rect(340, lineY - 5, 205, 36).fillColor("#0f172a").fill()
+      doc.font("ReceiptBold").fontSize(14).fillColor("#ffffff")
+      doc.text("TOTAL PAID", 355, lineY + 6).text(`\u20b9${bill.totalAmount.toFixed(2)}`, 440, lineY + 6, { align: "right", width: 95 })
 
-      doc
-        .fontSize(10)
-        .font("ReceiptRegular")
-        .fillColor("#334155")
-        .text(`Subtotal: \u20b9${bill.subtotalAmount.toFixed(2)}`, 50, rowY + 18, {
-          align: "right",
-        })
-        .text(`GST (${bill.gstRate.toFixed(0)}%): \u20b9${bill.gstAmount.toFixed(2)}`, 50, rowY + 34, {
-          align: "right",
-        })
-
-      doc
-        .fontSize(14)
-        .font("ReceiptBold")
-        .fillColor("#0f172a")
-        .text(`Total Paid: \u20b9${bill.totalAmount.toFixed(2)}`, 50, rowY + 56, {
-          align: "right",
-        })
-
-      // ---- Footer ----
+      // ---- Footer Branding ----
       doc
         .fontSize(8)
         .font("ReceiptRegular")
         .fillColor("#94a3b8")
         .text(
-          "This is a computer-generated receipt and is valid without a signature. Powered by Dhanvantari.",
+          "This is a computer-generated receipt and is valid without a physical signature.",
           50,
-          760,
+          740,
           { align: "center", width: 495 }
         )
+      
+      doc
+        .font("ReceiptBold")
+        .fillColor("#0ea5e9")
+        .text("Digitized by Dhanvantari", 50, 752, { align: "center", width: 495 })
 
       doc.end()
     })
