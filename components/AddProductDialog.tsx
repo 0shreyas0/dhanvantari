@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Plus, RefreshCcw, ScanBarcode } from "lucide-react"
 import type { Html5QrcodeScanner } from "html5-qrcode"
 import { useEffect, useRef } from "react"
+import { toast } from "sonner"
 
 import { createMedicine, getMedicineByBarcode } from "@/actions/inventory"
 import { useRouter } from "next/navigation"
@@ -168,13 +169,14 @@ export function AddProductDialog() {
             expiryDate: "",
         });
         router.refresh();
+        toast.success("Product created successfully!");
     } catch (error) {
         console.error("Failed to create product:", error);
-        alert("Failed to create product. Please try again.");
+        toast.error("Failed to create product. Please try again.");
     } finally {
         setLoading(false);
     }
-  }
+}
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

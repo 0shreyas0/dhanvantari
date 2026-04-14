@@ -26,13 +26,14 @@ export async function sendWhatsAppReceipt(
       `• ${item.name} x ${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}`
     ).join('\n');
 
-    const messageBody = `*Receipt from ${pharmacyName}*\n\n` +
+    const messageBody = `*${pharmacyName.toUpperCase()} - DIGI RECEIPT*\n` +
+      `--------------------------\n` +
       `*Customer:* ${customerName || 'Valued Customer'}\n` +
-      `*Bill ID:* ${billId.slice(-6).toUpperCase()}\n` +
+      `*Receipt ID:* ${billId.slice(-6).toUpperCase()}\n` +
       `*Date:* ${new Date().toLocaleDateString()}\n\n` +
-      `*Items:*\n${itemsList}\n\n` +
+      `*Items Dispensed:*\n${itemsList}\n\n` +
       `*Total Amount: ₹${total.toFixed(2)}*\n\n` +
-      `Thank you for choosing our pharmacy!`;
+      `_Digitized by Dhanvantari ✨_`;
 
     // Ensure number is in E.164 format and prefixed with whatsapp:
     let formattedTo = to.replace(/\D/g, '')

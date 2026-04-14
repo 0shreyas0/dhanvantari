@@ -286,3 +286,152 @@ export async function getBillDetails(billId: string) {
     pharmacyName: settings?.name || "Dhanvantari Pharmacy"
   }
 }
+export async function purgeUserData(targetUserId: string) {
+  const { userId } = await auth()
+  
+  // Security check: Only allow a user to purge their OWN data 
+  // (unless you want to add an Admin check here later)
+  if (!userId || userId !== targetUserId) {
+    throw new Error("Unauthorized to purge this user's data")
+  }
+
+  console.log(`Starting deep purge for user: ${targetUserId}`)
+
+  // Use a transaction to ensure everything or nothing is deleted
+  return await prisma.$transaction(async (tx) => {
+    // 1. Delete Settings
+    await tx.pharmacySettings.deleteMany({ where: { userId: targetUserId } })
+
+    // 2. Delete Bills (and items via relation)
+    // Note: Since BillItem is linked, we delete them first
+    await tx.billItem.deleteMany({
+      where: {
+        bill: { userId: targetUserId }
+      }
+    })
+    await tx.bill.deleteMany({ where: { userId: targetUserId } })
+
+    // 3. Delete Medicines (and batches/serial numbers)
+    // We catch SerialNumbers linked to Batches of this user's medicines
+    await tx.serialNumber.deleteMany({
+       where: {
+         batch: {
+             medicine: { userId: targetUserId }
+         }
+       }
+    })
+    await tx.batch.deleteMany({
+      where: {
+        medicine: { userId: targetUserId }
+      }
+    })
+    await tx.medicine.deleteMany({ where: { userId: targetUserId } })
+
+    // 4. Delete Vendors
+    await tx.vendor.deleteMany({ where: { userId: targetUserId } })
+
+    return { success: true, message: "All user data has been permanently purged." }
+  })
+}
+
+export async function exportInventoryToCSV() {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const medicines = await prisma.medicine.findMany({
+    where: { userId },
+    include: {
+      batches: true
+    }
+  })
+
+  // Flatten the data for CSV
+  const rows = medicines.flatMap(med => {
+      if (med.batches.length === 0) {
+          return [{
+              "Medicine Name": med.name,
+              "Barcode": med.barcode,
+              "Category": med.category || "",
+              "Batch No.": "N/A",
+              "Stock": 0,
+              "Selling Price": 0,
+              "Expiry Date": "N/A",
+              "Status": "Out of Stock"
+          }]
+      }
+      
+      return med.batches.map(batch => {
+          const isExpired = new Date(batch.expiryDate) < new Date()
+          return {
+              "Medicine Name": med.name,
+              "Barcode": med.barcode,
+              "Category": med.category || "",
+              "Batch No.": batch.batchNumber,
+              "Stock": batch.quantity,
+              "Selling Price": batch.sellingPrice,
+              "Expiry Date": new Date(batch.expiryDate).toLocaleDateString(),
+              "Status": isExpired ? "Expired" : (batch.quantity === 0 ? "Out of Stock" : "In Stock")
+          }
+      })
+  })
+
+  return rows
+}
+
+export async function importInventoryFromCSV(rows: any[]) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  let successCount = 0
+  let errorCount = 0
+
+  for (const row of rows) {
+    try {
+      const name = row["Medicine Name"]
+      const barcode = row["Barcode"]
+      const batchNumber = row["Batch No."] || "B-001"
+      const quantity = parseInt(row["Stock"]) || 0
+      const price = parseFloat(row["Selling Price"]) || 0
+      const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : new Date(Date.now() + 365*24*60*60*1000)
+
+      if (!name || !barcode) continue
+
+      // Use a transaction for each row to ensure medicine and batch are synced
+      await prisma.$transaction(async (tx) => {
+          // 1. Find or create medicine
+          let medicine = await tx.medicine.findUnique({
+              where: { barcode_userId: { barcode, userId } }
+          })
+
+          if (!medicine) {
+              medicine = await tx.medicine.create({
+                  data: {
+                      name,
+                      barcode,
+                      userId,
+                      category: row["Category"] || ""
+                  }
+              })
+          }
+
+          // 2. Add batch
+          await tx.batch.create({
+              data: {
+                  medicineId: medicine.id,
+                  batchNumber,
+                  quantity,
+                  sellingPrice: price,
+                  costPrice: price * 0.8, // Estimate cost if not provided
+                  expiryDate: expiry
+              }
+          })
+      })
+      successCount++
+    } catch (e) {
+      console.error("Failed to import row", row, e)
+      errorCount++
+    }
+  }
+
+  return { success: true, successCount, errorCount }
+}

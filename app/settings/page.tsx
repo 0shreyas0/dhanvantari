@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Loader2, Save, Store } from "lucide-react"
 import { getPharmacySettings, updatePharmacySettings } from "@/actions/settings"
+import { toast } from "sonner"
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -49,10 +50,10 @@ export default function SettingsPage() {
     setIsSaving(true);
     try {
         await updatePharmacySettings(formData);
-        alert("Settings saved successfully!");
+        toast.success("Settings saved successfully!");
     } catch (err) {
         console.error(err);
-        alert("Failed to save settings.");
+        toast.error("Failed to save settings.");
     } finally {
         setIsSaving(false);
     }

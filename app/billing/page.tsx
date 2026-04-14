@@ -11,8 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import BarcodeScanner from "@/components/BarcodeScanner"
 import { searchProducts, processBill, getBillDetails } from "@/actions/inventory"
 import { sendWhatsAppReceipt } from "@/actions/whatsapp"
-import { Loader2, Plus, Minus, Trash2, Search, UserCircle, CheckCircle2, Share2, MessageCircle, Send } from "lucide-react"
+import { sendEmailReceipt } from "@/actions/email"
+import { Loader2, Plus, Minus, Trash2, Search, UserCircle, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp } from "lucide-react"
 import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 import {
   Dialog,
   DialogContent,
@@ -46,11 +48,15 @@ export default function BillingPage() {
   // Customer details for checkout
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
+  const [customerEmail, setCustomerEmail] = useState("")
 
   // Success State
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [lastBill, setLastBill] = useState<any>(null)
   const [isSendingWa, setIsSendingWa] = useState(false)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Prevention for rapid duplicate scans (2-second cooldown for same barcode)
   const lastScannedRef = useRef<{ code: string, time: number }>({ code: "", time: 0 });
@@ -106,7 +112,7 @@ export default function BillingPage() {
 
   const addToBill = (product: Product) => {
     if (product.isExpired) {
-      alert(`SAFETY LOCK: Cannot add ${product.name} to bill because the available stock is expired!`)
+      toast.error(`SAFETY LOCK: Cannot add ${product.name} to bill because the available stock is expired!`)
       return
     }
     
@@ -157,12 +163,14 @@ export default function BillingPage() {
         setBillItems([])
         setCustomerName("")
         setCustomerPhone("")
+        setCustomerEmail("")
+        toast.success("Bill processed successfully")
       } else {
-        alert(result.error || "Failed to process bill.")
+        toast.error(result.error || "Failed to process bill.")
       }
     } catch (e) {
       console.error(e)
-      alert("Failed to process bill.")
+      toast.error("Failed to process bill.")
     } finally {
       setIsProcessing(false)
     }
@@ -170,7 +178,7 @@ export default function BillingPage() {
 
   const handleWhatsAppShare = async () => {
     if (!lastBill || !lastBill.customerPhone) {
-        alert("Please provide a customer phone number first.")
+        toast.error("Please provide a customer phone number first.")
         return
     }
 
@@ -190,15 +198,114 @@ export default function BillingPage() {
       )
 
       if (result.success) {
-        alert("Bot has sent the message successfully!")
+        toast.success("Bot has sent the message successfully!")
       } else {
-        alert(`Bot failed: ${result.error}`)
+        toast.error(`Bot failed: ${result.error}`)
       }
     } catch (e) {
       console.error(e)
-      alert("Failed to trigger Bot.")
+      toast.error("Failed to trigger Bot.")
     } finally {
       setIsSendingWa(false)
+    }
+  }
+
+  const handleEmailShare = async () => {
+    if (!lastBill || !customerEmail) {
+        toast.error("Please provide a valid email address.")
+        return
+    }
+
+    setIsSendingEmail(true)
+    try {
+      const result = await sendEmailReceipt(
+        customerEmail,
+        lastBill.customerName || "Customer",
+        lastBill.id,
+        lastBill.totalAmount,
+        lastBill.items.map((item: any) => ({
+          name: item.medicine.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        lastBill.pharmacyName
+      )
+
+      if (result.success) {
+        toast.success("Email receipt sent successfully!")
+      } else {
+        toast.error(`Email failed: ${result.error}`)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to send Email.")
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    toast.loading("Scanning for barcodes...")
+    
+    try {
+      let fileToScan = file
+      
+      // Special logic for PDF files
+      if (file.type === "application/pdf") {
+        // Dynamic import pdfjs
+        const pdfJS = await import("pdfjs-dist")
+        // Configure worker (Switching to UNPKG for more reliable version matching)
+        pdfJS.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfJS.version}/build/pdf.worker.min.mjs`
+        
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfJS.getDocument({ data: arrayBuffer }).promise
+        const page = await pdf.getPage(1) // Usually we only need the first page for stickers
+        
+        const viewport = page.getViewport({ scale: 4.0 }) // Quadruple resolution for small stickers
+        const canvas = document.createElement("canvas")
+        const context = canvas.getContext("2d")
+        canvas.height = viewport.height
+        canvas.width = viewport.width
+        
+        if (context) {
+          // Force WHITE background (critical for barcode contrast in PDFs)
+          context.fillStyle = "white"
+          context.fillRect(0, 0, canvas.width, canvas.height)
+          
+          await page.render({ canvasContext: context, viewport }).promise
+          const dataUrl = canvas.toDataURL("image/png")
+          const blob = await (await fetch(dataUrl)).blob()
+          fileToScan = new File([blob], "converted-pdf.png", { type: "image/png" })
+        }
+      }
+
+      // Dynamic import html5-qrcode
+      const { Html5Qrcode } = await import("html5-qrcode")
+      
+      const tempDivId = "hidden-reader"
+      let tempDiv = document.getElementById(tempDivId)
+      if (!tempDiv) {
+          tempDiv = document.createElement("div")
+          tempDiv.id = tempDivId
+          tempDiv.style.display = "none"
+          document.body.appendChild(tempDiv)
+      }
+
+      const html5QrCode = new Html5Qrcode(tempDivId)
+      
+      // Use experimental features for file scanning to improve detection rate
+      const decodedText = await html5QrCode.scanFileV2(fileToScan, false)
+      await handleScanSuccess(decodedText.decodedText)
+      toast.success("Barcode detected from file!")
+    } catch (err) {
+      console.error(err)
+      toast.error("Could not find a valid barcode in that file.")
+    } finally {
+        e.target.value = ""
+        toast.dismiss()
     }
   }
 
@@ -292,6 +399,17 @@ export default function BillingPage() {
                       className="bg-background"
                     />
                   </div>
+                  <div className="col-span-2 mt-2">
+                    <Label htmlFor="customerEmail" className="text-xs text-muted-foreground mb-1.5 block">Email Address (Optional)</Label>
+                    <Input 
+                      id="customerEmail"
+                      type="email"
+                      placeholder="e.g. customer@example.com"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-2 mb-4">
@@ -360,14 +478,56 @@ export default function BillingPage() {
                   </TabsContent>
                   
                   <TabsContent value="scan">
-                    <div className="mt-4">
-                        <BarcodeScanner 
-                            onScanSuccess={handleScanSuccess} 
-                            onScanFailure={(err) => console.log(err)} 
-                        />
-                        <p className="text-xs text-center text-muted-foreground mt-2">
-                            Point camera at a barcode to scan.
-                        </p>
+                    <div className="mt-4 space-y-4">
+                        {!isCameraActive ? (
+                            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/30">
+                                <ScanBarcode className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
+                                <h3 className="text-sm font-medium mb-4">Camera is Disengaged</h3>
+                                <div className="grid grid-cols-1 w-full gap-3">
+                                    <Button 
+                                        size="lg" 
+                                        className="w-full gap-2 bg-primary" 
+                                        onClick={() => setIsCameraActive(true)}
+                                    >
+                                        <ScanBarcode className="h-4 w-4" />
+                                        Start Scanning Session
+                                    </Button>
+                                    <Button 
+                                        variant="outline" 
+                                        size="lg" 
+                                        className="w-auto gap-2 border-dashed"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <ImageUp className="h-4 w-4" />
+                                        Upload Image File
+                                    </Button>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*,.pdf" 
+                                        onChange={handleFileUpload} 
+                                    />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <BarcodeScanner 
+                                    onScanSuccess={handleScanSuccess} 
+                                    onScanFailure={(err) => console.log(err)} 
+                                />
+                                <Button 
+                                    variant="destructive" 
+                                    className="w-full gap-2 py-6" 
+                                    onClick={() => setIsCameraActive(false)}
+                                >
+                                    Stop Camera / Disengage
+                                </Button>
+                                <p className="text-[10px] text-center text-muted-foreground">
+                                    The scanner is now live. Point camera at a barcode.
+                                </p>
+                            </div>
+                        )}
                     </div>
                   </TabsContent>
                 </Tabs>
@@ -409,7 +569,7 @@ export default function BillingPage() {
             <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
               <Button 
                 variant="outline" 
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 border-green-200 hover:bg-green-50 dark:border-green-800/20"
                 disabled={isSendingWa || !lastBill?.customerPhone}
                 onClick={handleWhatsAppShare}
               >
@@ -418,7 +578,20 @@ export default function BillingPage() {
                 ) : (
                   <MessageCircle className="h-4 w-4 text-green-600" />
                 )}
-                {isSendingWa ? "Sending..." : "Send via Bot"}
+                {isSendingWa ? "Sending..." : "Send WhatsApp"}
+              </Button>
+              <Button 
+                variant="outline" 
+                className="flex-1 gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-800/20"
+                disabled={isSendingEmail || !customerEmail}
+                onClick={handleEmailShare}
+              >
+                {isSendingEmail ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mail className="h-4 w-4 text-blue-600" />
+                )}
+                {isSendingEmail ? "Sending..." : "Send Email"}
               </Button>
               <Button 
                 variant="default" 

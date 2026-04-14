@@ -87,6 +87,8 @@ export default function BarcodeScanner({ onScanSuccess, onScanFailure }: Barcode
         #reader button:hover, #reader span[id*="anchor-scan-type-change"]:hover { opacity: 0.9 !important; }
         #reader img { opacity: 0.7 !important; display: block !important; margin: 0 auto 16px auto !important; max-width: 100px !important; }
         :is(.dark, [data-theme="dark"]) #reader img { filter: brightness(0) invert(1) !important; }
+        /* Hide the redundant internal library buttons to avoid the 'double button' glitch */
+        #html5-qrcode-button-camera-stop, #html5-qrcode-button-camera-start { display: none !important; }
       `}} />
       <div id="reader" className="w-full relative"></div>
     </div>
