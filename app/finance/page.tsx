@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import PageContainer from "@/components/PageContainer";
 import MainLayout from "@/components/MainLayout";
 import { prisma } from "@/lib/prisma";
+import { getSignedPdfUrl } from "@/lib/pdf-token";
 import { format } from "date-fns";
-import { Receipt, Search, Filter } from "lucide-react";
+import { Download, Receipt, Search, Filter } from "lucide-react";
 
 import {
   Table,
@@ -59,7 +60,8 @@ export default async function FinancePage() {
     customerPhone: bill.customerPhone,
     totalAmount: bill.totalAmount,
     createdAt: bill.createdAt,
-    itemsText: bill.items.map(i => `${i.medicine.name} x${i.quantity}`).join(', ')
+    itemsText: bill.items.map(i => `${i.medicine.name} x${i.quantity}`).join(', '),
+    pdfUrl: getSignedPdfUrl(bill.id),
   }));
 
   const totalRevenue = bills.reduce((sum, b) => sum + b.totalAmount, 0);
@@ -124,6 +126,7 @@ export default async function FinancePage() {
                             <TableHead>Customer</TableHead>
                             <TableHead className="max-w-[300px]">Items Purchased</TableHead>
                             <TableHead className="text-right">Total Amount</TableHead>
+                            <TableHead className="text-right">Bill</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -154,11 +157,18 @@ export default async function FinancePage() {
                                     <TableCell className="text-right">
                                         <span className="font-bold text-base">₹{bill.totalAmount.toFixed(2)}</span>
                                     </TableCell>
+                                    <TableCell className="text-right">
+                                        <Button asChild variant="outline" size="icon" className="h-9 w-9">
+                                            <a href={bill.pdfUrl} target="_blank" rel="noopener noreferrer">
+                                                <Download className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    </TableCell>
                                 </TableRow>
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-48 text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
                                     <div className="flex flex-col items-center justify-center">
                                         <Receipt className="h-10 w-10 mb-4 opacity-20" />
                                         <p>No transactions found.</p>
