@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@clerk/nextjs/server"
 import Fuse from "fuse.js"
 import { generateEAN13 } from "@/lib/barcode"
+import { calculateBillSummaryFromItems } from "@/lib/billing"
 
 export async function searchProducts(query: string) {
   if (!query) return []
@@ -129,14 +130,17 @@ export async function processBill(
     }
   }
 
-  const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
+  const summary = calculateBillSummaryFromItems(items)
 
   const bill = await prisma.bill.create({
     data: {
       userId,
       customerName: customer?.name || null,
       customerPhone: customer?.phone || null,
-      totalAmount,
+      subtotalAmount: summary.subtotalAmount,
+      gstRate: summary.gstRate,
+      gstAmount: summary.gstAmount,
+      totalAmount: summary.totalAmount,
       items: {
         create: items.map(item => ({
           medicineId: item.medicineId,
@@ -181,7 +185,11 @@ export async function processBill(
     }
   }
 
-  return { success: true, billId: bill.id }
+  // Generate signed PDF URL for immediate utility
+  const { getSignedPdfUrl } = await import("@/lib/pdf-token")
+  const pdfUrl = getSignedPdfUrl(bill.id)
+
+  return { success: true, billId: bill.id, pdfUrl }
 }
 // ...existing code...
 
@@ -538,28 +546,68 @@ export async function importInventoryFromCSV(rows: any[]) {
   let successCount = 0
   let errorCount = 0
 
+  // Helper to parse DD/MM/YYYY or standard formats
+  const parseFlexibleDate = (dateStr: string): Date => {
+    if (!dateStr || dateStr.includes('dd/mm/yyyy') || dateStr.includes('##')) {
+        const d = new Date()
+        d.setFullYear(d.getFullYear() + 1)
+        return d
+    }
+
+    // Try standard parsing first
+    let d = new Date(dateStr)
+    if (!isNaN(d.getTime())) return d
+
+    // Try DD/MM/YYYY
+    const parts = dateStr.split(/[/.-]/)
+    if (parts.length === 3) {
+      const day = parseInt(parts[0])
+      const month = parseInt(parts[1]) - 1 // 0-indexed
+      const year = parseInt(parts[2])
+      
+      // Handle 2-digit years if needed, but usually 4 is expected
+      if (year < 100) {
+          const fullYear = year + (year > 50 ? 1900 : 2000)
+          d = new Date(fullYear, month, day)
+      } else {
+          d = new Date(year, month, day)
+      }
+      
+      if (!isNaN(d.getTime())) return d
+    }
+
+    const fallback = new Date()
+    fallback.setFullYear(fallback.getFullYear() + 1)
+    return fallback
+  }
+
+  // Helper to parse numbers safely
+  const parseNum = (val: any, fallback = 0) => {
+    if (typeof val === 'string') {
+        // Strip non-numeric except decimal
+        const clean = val.replace(/[^0-9.]/g, '')
+        const parsed = parseFloat(clean)
+        return isNaN(parsed) ? fallback : parsed
+    }
+    return typeof val === 'number' ? val : fallback
+  }
+
   for (const row of rows) {
     try {
       const name = row["Medicine Name"]
-      if (!name) continue
+      if (!name || name.toLowerCase().includes("medicine name")) continue
 
-      // STRICT SYSTEM GENERATION (Ignore CSV columns for these)
-      const barcode = Date.now().toString() + Math.floor(Math.random() * 1000).toString()
-      const batchNumber = "BAT-" + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      // Use a consistent internal barcode/batch generation policy
+      const barcode = Date.now().toString().slice(-8) + Math.floor(Math.random() * 100000).toString().padStart(5, '0')
+      const batchNumber = "B-" + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 
-      // Capture available data, default to 0/placeholder if not present
-      const quantity = parseInt(row["Stock"]) || 0
-      const sellingPrice = parseFloat(row["Selling Price"]) || 0
-      const costPrice = row["Cost Price"] ? parseFloat(row["Cost Price"]) : sellingPrice * 0.8
-      
-      // Default to 1 year from now if expiry isn't found
-      const defaultExpiry = new Date()
-      defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1)
-      const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : defaultExpiry
+      const quantity = Math.floor(parseNum(row["Stock"]))
+      const sellingPrice = parseNum(row["Selling Price"])
+      // Cost price fallback: 80% of selling price if missing
+      const costPrice = row["Cost Price"] ? parseNum(row["Cost Price"]) : sellingPrice * 0.8
+      const expiry = parseFlexibleDate(row["Expiry Date"])
 
-      // Use a transaction for each row to ensure medicine and batch are synced
       await prisma.$transaction(async (tx: any) => {
-          // 1. Find or create medicine by name
           let medicine = await tx.medicine.findFirst({
               where: { name, userId }
           })
@@ -575,7 +623,6 @@ export async function importInventoryFromCSV(rows: any[]) {
               })
           }
 
-          // 2. Add batch with strictly generated metadata
           await tx.batch.create({
               data: {
                   medicineId: medicine.id,

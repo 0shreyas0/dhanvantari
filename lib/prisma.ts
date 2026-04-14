@@ -13,9 +13,9 @@ if (process.env.NODE_ENV === "production") {
 } else {
   const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
   
-  // Re-create client if it's stale (doesn't have the new model)
-  if (globalForPrisma.prisma && !('expirySettings' in globalForPrisma.prisma)) {
-    console.log("Stale Prisma Client detected, recreating...")
+  // Re-create client if it's stale (doesn't have newest schema fields)
+  if (globalForPrisma.prisma && !('subtotalAmount' in (globalForPrisma.prisma as any).bill.fields)) {
+    console.log("Stale Prisma Client detected (missing subtotalAmount), recreating...")
     delete (globalForPrisma as any).prisma
   }
 

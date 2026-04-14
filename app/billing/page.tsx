@@ -13,7 +13,7 @@ import { searchProducts, processBill, getBillDetails } from "@/actions/inventory
 import { sendWhatsAppReceipt } from "@/actions/whatsapp"
 import { sendEmailReceipt } from "@/actions/email"
 import { getExpirySettings } from "@/actions/settings"
-import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle } from "lucide-react"
+import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -26,6 +26,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { DEFAULT_EXPIRY_SETTINGS, ExpirySettings } from "@/lib/expiry"
+import { calculateBillSummaryFromItems } from "@/lib/billing"
 
 interface Product {
   id: string
@@ -65,9 +66,12 @@ export default function BillingPage() {
   // Success State
   const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [lastBill, setLastBill] = useState<any>(null)
+  const [lastPdfUrl, setLastPdfUrl] = useState<string>("")
   const [nearExpiryCount, setNearExpiryCount] = useState(0)
   const [isSendingWa, setIsSendingWa] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [waSent, setWaSent] = useState(false)
+  const [emailSent, setEmailSent] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [lastCustomerEmail, setLastCustomerEmail] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -198,8 +202,9 @@ export default function BillingPage() {
       if (result.success && result.billId) {
         const details = await getBillDetails(result.billId)
         setLastBill(details)
+        if (result.pdfUrl) setLastPdfUrl(result.pdfUrl)
         setNearExpiryCount(billItems.filter(i => i.isNearExpiry).length)
-        setLastCustomerEmail(customerEmail) // Preserve email for success dialog before clearing
+        setLastCustomerEmail(customerEmail)
         setShowSuccessDialog(true)
         setBillItems([])
         setCustomerName("")
@@ -228,7 +233,12 @@ export default function BillingPage() {
         lastBill.customerPhone,
         lastBill.customerName || "Customer",
         lastBill.id,
-        lastBill.totalAmount,
+        {
+          subtotalAmount: lastBill.subtotalAmount,
+          gstAmount: lastBill.gstAmount,
+          gstRate: lastBill.gstRate,
+          totalAmount: lastBill.totalAmount,
+        },
         lastBill.items.map((item: any) => ({
           name: item.medicine.name,
           quantity: item.quantity,
@@ -236,8 +246,12 @@ export default function BillingPage() {
         })),
         lastBill.pharmacyName
       )
-      if (result.success) toast.success("Bot has sent the message successfully!")
-      else toast.error(`Bot failed: ${result.error}`)
+      if (result.success) {
+          toast.success("Receipt sent via WhatsApp!")
+          setWaSent(true)
+      } else {
+          toast.error(`WhatsApp failed: ${result.error}`)
+      }
     } catch (e) {
       console.error(e)
       toast.error("Failed to trigger Bot.")
@@ -257,7 +271,12 @@ export default function BillingPage() {
         lastCustomerEmail,
         lastBill.customerName || "Customer",
         lastBill.id,
-        lastBill.totalAmount,
+        {
+          subtotalAmount: lastBill.subtotalAmount,
+          gstAmount: lastBill.gstAmount,
+          gstRate: lastBill.gstRate,
+          totalAmount: lastBill.totalAmount,
+        },
         lastBill.items.map((item: any) => ({
           name: item.medicine.name,
           quantity: item.quantity,
@@ -265,8 +284,12 @@ export default function BillingPage() {
         })),
         lastBill.pharmacyName
       )
-      if (result.success) toast.success("Email receipt sent successfully!")
-      else toast.error(`Email failed: ${result.error}`)
+      if (result.success) {
+          toast.success("Email receipt sent successfully!")
+          setEmailSent(true)
+      } else {
+          toast.error(`Email failed: ${result.error}`)
+      }
     } catch (e) {
       console.error(e)
       toast.error("Failed to send Email.")
@@ -332,7 +355,7 @@ export default function BillingPage() {
     }
   }
 
-  const totalAmount = billItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const billSummary = calculateBillSummaryFromItems(billItems)
 
   return (
     <PageContainer>
@@ -418,9 +441,19 @@ export default function BillingPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 mb-4">
-                  <span className="text-lg font-medium">Total Amount</span>
-                  <span className="text-2xl font-bold">₹{totalAmount.toFixed(2)}</span>
+                <div className="space-y-2 pt-2 mb-4">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Subtotal</span>
+                    <span>₹{billSummary.subtotalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>GST ({billSummary.gstRate.toFixed(0)}%)</span>
+                    <span>₹{billSummary.gstAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg font-medium">Total Amount</span>
+                    <span className="text-2xl font-bold">₹{billSummary.totalAmount.toFixed(2)}</span>
+                  </div>
                 </div>
                 <Button size="lg" className="w-full" disabled={billItems.length === 0 || isProcessing} onClick={handleProcessBill}>
                   {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -587,6 +620,14 @@ export default function BillingPage() {
                   <span className="font-medium">{lastBill?.customerName || "Walk-in Customer"}</span>
                </div>
                <div className="flex justify-between text-sm pt-2 border-t border-border">
+                  <span className="text-muted-foreground">Subtotal:</span>
+                  <span className="font-medium">₹{lastBill?.subtotalAmount?.toFixed(2)}</span>
+               </div>
+               <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">GST ({lastBill?.gstRate?.toFixed?.(0) ?? 0}%):</span>
+                  <span className="font-medium">₹{lastBill?.gstAmount?.toFixed(2)}</span>
+               </div>
+               <div className="flex justify-between text-sm pt-2 border-t border-border">
                   <span className="font-semibold">Total Paid:</span>
                   <span className="font-bold text-primary text-lg">₹{lastBill?.totalAmount?.toFixed(2)}</span>
                </div>
@@ -598,30 +639,56 @@ export default function BillingPage() {
                )}
             </div>
 
-            <DialogFooter className="flex flex-col sm:flex-row gap-2 mt-4">
-              <Button variant="outline" className="flex-1 gap-2 border-green-200 hover:bg-green-50 dark:border-green-800/20" disabled={isSendingWa || !lastBill?.customerPhone} onClick={handleWhatsAppShare}>
-                {isSendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4 text-green-600" />}
-                {isSendingWa ? "Sending..." : "Send WhatsApp"}
-              </Button>
-              <Button variant="outline" className="flex-1 gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-800/20" disabled={isSendingEmail || !lastCustomerEmail} onClick={handleEmailShare}>
-                {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 text-blue-600" />}
-                {isSendingEmail ? "Sending..." : "Send Email"}
-              </Button>
+            <div className="flex flex-col gap-3 mt-6">
               <Button 
                 variant="default" 
-                className="flex-1"
+                className="w-full gap-2 h-11 bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20" 
+                disabled={!lastPdfUrl}
+                onClick={() => window.open(lastPdfUrl, '_blank')}
+              >
+                <Download className="h-4 w-4" />
+                Download PDF Receipt
+              </Button>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <Button 
+                  variant="outline" 
+                  className={`gap-2 ${waSent ? 'border-green-500/50 bg-green-500/5 text-green-600' : 'border-green-200 hover:bg-green-50 dark:border-green-800/20 dark:hover:bg-green-900/10'}`} 
+                  disabled={isSendingWa || !lastBill?.customerPhone || waSent} 
+                  onClick={handleWhatsAppShare}
+                >
+                  {isSendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : waSent ? <CheckCircle2 className="h-4 w-4" /> : <MessageCircle className="h-4 w-4 text-green-600" />}
+                  {waSent ? "Sent!" : "WhatsApp"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className={`gap-2 ${emailSent ? 'border-blue-500/50 bg-blue-500/5 text-blue-600' : 'border-blue-200 hover:bg-blue-50 dark:border-blue-800/20 dark:hover:bg-blue-900/10'}`} 
+                  disabled={isSendingEmail || !lastCustomerEmail || emailSent} 
+                  onClick={handleEmailShare}
+                >
+                  {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : emailSent ? <CheckCircle2 className="h-4 w-4" /> : <Mail className="h-4 w-4 text-blue-600" />}
+                  {emailSent ? "Sent!" : "Email"}
+                </Button>
+              </div>
+
+              <Button 
+                variant="ghost" 
+                className="w-full mt-2 text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   setShowSuccessDialog(false)
                   setTimeout(() => {
                     setCustomerName("")
                     setCustomerPhone("")
                     setCustomerEmail("")
-                  }, 300) // Delay reset slightly until dialog transition finishes
+                    setLastPdfUrl("")
+                    setWaSent(false)
+                    setEmailSent(false)
+                  }, 300)
                 }}
               >
-                Done
+                Done / Close
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </MainLayout>

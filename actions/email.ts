@@ -17,7 +17,12 @@ export async function sendEmailReceipt(
   to: string,
   customerName: string,
   billId: string,
-  total: number,
+  totals: {
+    subtotalAmount: number
+    gstAmount: number
+    gstRate: number
+    totalAmount: number
+  },
   items: { name: string, quantity: number, price: number }[],
   pharmacyName: string
 ) {
@@ -71,8 +76,16 @@ export async function sendEmailReceipt(
             </tbody>
             <tfoot>
               <tr>
+                <td colspan="2" style="padding: 10px; text-align: right; color: #475569;">Subtotal:</td>
+                <td style="padding: 10px; text-align: right; color: #0f172a;">₹${totals.subtotalAmount.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding: 10px; text-align: right; color: #475569;">GST (${totals.gstRate.toFixed(0)}%):</td>
+                <td style="padding: 10px; text-align: right; color: #0f172a;">₹${totals.gstAmount.toFixed(2)}</td>
+              </tr>
+              <tr>
                 <td colspan="2" style="padding: 20px 10px; text-align: right; font-weight: bold; font-size: 18px;">Total Paid:</td>
-                <td style="padding: 20px 10px; text-align: right; font-weight: bold; font-size: 18px; color: #020617;">₹${total.toFixed(2)}</td>
+                <td style="padding: 20px 10px; text-align: right; font-weight: bold; font-size: 18px; color: #020617;">₹${totals.totalAmount.toFixed(2)}</td>
               </tr>
             </tfoot>
           </table>
@@ -96,8 +109,11 @@ export async function sendEmailReceipt(
     })
 
     return { success: true }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to send email receipt:", error)
-    return { success: false, error: error.message }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown email error",
+    }
   }
 }

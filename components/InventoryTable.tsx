@@ -139,13 +139,36 @@ export default function InventoryTable({
       if (!response.ok) throw new Error("Failed to fetch sheet. Ensure it is shared as 'Anyone with the link can view'.")
       
       const csvText = await response.text()
-      const lines = csvText.split("\n")
-      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""))
+      const lines = csvText.split(/\r?\n/).filter(line => line.trim())
       
-      const parsedRows = lines.slice(1).filter(line => line.trim()).map(line => {
-        const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""))
+      // Find the header row (the first row containing "Medicine Name")
+      let headerIndex = lines.findIndex(line => line.toLowerCase().includes("medicine name"))
+      if (headerIndex === -1) headerIndex = 0 // Fallback to first line
+
+      const headerLine = lines[headerIndex]
+      const headers = headerLine.split(",").map(h => h.trim().replace(/^"|"$/g, ""))
+      
+      const parsedRows = lines.slice(headerIndex + 1).map(line => {
+        // Robust CSV split for commas, handling quotes correctly
+        const values: string[] = []
+        let current = ""
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i]
+            if (char === '"') inQuotes = !inQuotes
+            else if (char === ',' && !inQuotes) {
+                values.push(current)
+                current = ""
+            } else {
+                current += char
+            }
+        }
+        values.push(current)
+
         const row: any = {}
-        headers.forEach((h, i) => { row[h] = values[i] })
+        headers.forEach((h, i) => { 
+            row[h] = (values[i] || "").trim().replace(/^"|"$/g, "") 
+        })
         return row
       })
 
@@ -219,17 +242,37 @@ export default function InventoryTable({
     reader.onload = async event => {
       try {
         const text = event.target?.result as string
-        const lines = text.split("\n")
-        const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""))
-        const rows = lines
-          .slice(1)
-          .filter(l => l.trim())
-          .map(line => {
-            const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""))
+        const lines = text.split(/\r?\n/).filter(l => l.trim())
+        
+        // Find header row
+        let headerIndex = lines.findIndex(line => line.toLowerCase().includes("medicine name"))
+        if (headerIndex === -1) headerIndex = 0
+
+        const headerLine = lines[headerIndex]
+        const headers = headerLine.split(",").map(h => h.trim().replace(/^"|"$/g, ""))
+        
+        const rows = lines.slice(headerIndex + 1).map(line => {
+            const values: string[] = []
+            let current = ""
+            let inQuotes = false
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i]
+                if (char === '"') inQuotes = !inQuotes
+                else if (char === ',' && !inQuotes) {
+                    values.push(current)
+                    current = ""
+                } else {
+                    current += char
+                }
+            }
+            values.push(current)
+
             const obj: any = {}
-            headers.forEach((h, i) => { obj[h] = values[i] })
+            headers.forEach((h, i) => { 
+                obj[h] = (values[i] || "").trim().replace(/^"|"$/g, "") 
+            })
             return obj
-          })
+        })
         if (rows.length === 0) { toast.error("CSV file is empty"); return }
         const result = await importInventoryFromCSV(rows)
         if (result.success) {

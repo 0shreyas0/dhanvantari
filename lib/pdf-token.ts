@@ -14,7 +14,7 @@ export function generatePdfToken(billId: string): string {
  * Returns the full signed URL for a bill's PDF receipt.
  */
 export function getSignedPdfUrl(billId: string): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  const base = process.env.NEXT_PUBLIC_APP_URL || "https://dhanvantari-five.vercel.app"
   const token = generatePdfToken(billId)
   return `${base}/api/bill/${billId}/pdf?token=${token}`
 }

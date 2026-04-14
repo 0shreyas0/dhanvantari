@@ -130,7 +130,7 @@ export async function GET(
       rowY += 20
     })
 
-    // ---- Total ----
+    // ---- Totals ----
     doc.moveDown(0.5)
     doc
       .moveTo(50, rowY + 5)
@@ -139,10 +139,17 @@ export async function GET(
       .stroke()
 
     doc
+      .fontSize(10)
+      .font("Helvetica")
+      .fillColor("#334155")
+      .text(`Subtotal: \u20b9${bill.subtotalAmount.toFixed(2)}`, 50, rowY + 18, { align: "right" })
+      .text(`GST (${bill.gstRate.toFixed(0)}%): \u20b9${bill.gstAmount.toFixed(2)}`, 50, rowY + 34, { align: "right" })
+
+    doc
       .fontSize(14)
       .font("Helvetica-Bold")
       .fillColor("#0f172a")
-      .text(`Total Paid: \u20b9${bill.totalAmount.toFixed(2)}`, 50, rowY + 15, { align: "right" })
+      .text(`Total Paid: \u20b9${bill.totalAmount.toFixed(2)}`, 50, rowY + 56, { align: "right" })
 
     // ---- Footer ----
     doc

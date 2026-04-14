@@ -84,6 +84,17 @@ export default async function PublicBillPage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="mt-10 pt-10 border-t-2 border-muted">
+              <div className="space-y-3 mb-8">
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₹{bill.subtotalAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>GST ({bill.gstRate.toFixed(0)}%)</span>
+                  <span>₹{bill.gstAmount.toFixed(2)}</span>
+                </div>
+              </div>
+
               <div className="flex justify-between items-end mb-8">
                 <div>
                    <h2 className="text-4xl font-black text-primary">₹{bill.totalAmount.toFixed(2)}</h2>

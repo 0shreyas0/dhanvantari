@@ -13,7 +13,12 @@ export async function sendWhatsAppReceipt(
   to: string,
   customerName: string,
   billId: string,
-  total: number,
+  totals: {
+    subtotalAmount: number
+    gstAmount: number
+    gstRate: number
+    totalAmount: number
+  },
   items: { name: string, quantity: number, price: number }[],
   pharmacyName: string
 ) {
@@ -35,7 +40,9 @@ export async function sendWhatsAppReceipt(
       `*Receipt ID:* ${billId.slice(-6).toUpperCase()}\n` +
       `*Date:* ${new Date().toLocaleDateString()}\n\n` +
       `*Items Dispensed:*\n${itemsList}\n\n` +
-      `*Total Amount: ₹${total.toFixed(2)}*\n\n` +
+      `Subtotal: ₹${totals.subtotalAmount.toFixed(2)}\n` +
+      `GST (${totals.gstRate.toFixed(0)}%): ₹${totals.gstAmount.toFixed(2)}\n` +
+      `*Total Amount: ₹${totals.totalAmount.toFixed(2)}*\n\n` +
       `📄 *Download PDF Receipt:*\n${pdfUrl}\n\n` +
       `_Digitized by Dhanvantari ✨_`;
 
@@ -53,8 +60,11 @@ export async function sendWhatsAppReceipt(
 
     console.log("WhatsApp message sent:", message.sid)
     return { success: true, sid: message.sid }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Failed to send WhatsApp message:", error)
-    return { success: false, error: error.message }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown WhatsApp error",
+    }
   }
 }
