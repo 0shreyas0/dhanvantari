@@ -29,11 +29,19 @@ export async function searchProducts(query: string) {
     
     let isExpired = false
     let isExpiringSoon = false
+    let expiryDate: string | null = null
+    let daysToExpiry: number | null = null
 
     if (availableBatches.length > 0) {
       const nextBatch = availableBatches[0]
+      expiryDate = nextBatch.expiryDate.toISOString()
+      const msPerDay = 1000 * 60 * 60 * 24
+      daysToExpiry = Math.floor(
+        (new Date(nextBatch.expiryDate).setHours(0,0,0,0) - new Date(now).setHours(0,0,0,0)) / msPerDay
+      )
       if (nextBatch.expiryDate < now) {
         isExpired = true
+        daysToExpiry = daysToExpiry // will be negative
       } else if (nextBatch.expiryDate <= thirtyDaysFromNow) {
         isExpiringSoon = true
       }
@@ -41,6 +49,7 @@ export async function searchProducts(query: string) {
       const lastBatch = [...med.batches].sort((a,b) => b.expiryDate.getTime() - a.expiryDate.getTime())[0]
       if (lastBatch.expiryDate < now) {
           isExpired = true
+          expiryDate = lastBatch.expiryDate.toISOString()
       }
     }
 
@@ -51,7 +60,9 @@ export async function searchProducts(query: string) {
       stock,
       price,
       isExpired,
-      isExpiringSoon
+      isExpiringSoon,
+      expiryDate,
+      daysToExpiry,
     }
   })
 

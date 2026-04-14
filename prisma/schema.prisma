@@ -116,3 +116,16 @@ model PharmacySettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// 6. Expiry Warning Settings (per-user thresholds)
+model ExpirySettings {
+  id                String @id @default(uuid())
+  userId            String @unique
+
+  earlyWarningDays  Int @default(90)  // Yellow: warn this many days before expiry
+  urgentWarningDays Int @default(30)  // Orange: urgent warning
+  criticalDays      Int @default(7)   // Red: critical / last chance
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

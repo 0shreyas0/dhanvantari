@@ -6,10 +6,23 @@ const connectionString = process.env.DATABASE_URL
 const pool = new Pool({ connectionString })
 const adapter = new PrismaPg(pool)
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+let prisma: PrismaClient
 
-export const prisma =
-  globalForPrisma.prisma ||
-  new PrismaClient({ adapter })
+if (process.env.NODE_ENV === "production") {
+  prisma = new PrismaClient({ adapter })
+} else {
+  const globalForPrisma = globalThis as unknown as { prisma: PrismaClient }
+  
+  // Re-create client if it's stale (doesn't have the new model)
+  if (globalForPrisma.prisma && !('expirySettings' in globalForPrisma.prisma)) {
+    console.log("Stale Prisma Client detected, recreating...")
+    delete (globalForPrisma as any).prisma
+  }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = new PrismaClient({ adapter })
+  }
+  prisma = globalForPrisma.prisma
+}
+
+export { prisma }

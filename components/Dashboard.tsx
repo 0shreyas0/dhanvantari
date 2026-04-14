@@ -5,6 +5,8 @@ import MainLayout from "@/components/MainLayout";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import WeightedScore from "@/components/dashboard/WeightedScore";
 import StockPercentage from "@/components/dashboard/StockPercentage";
+import ExpiryAlertsCard, { ExpiryAlertBatch } from "@/components/ExpiryAlertsCard";
+import { ExpirySettings } from "@/lib/expiry";
 
 interface DashboardProps {
   stats: {
@@ -15,13 +17,12 @@ interface DashboardProps {
     stockHealth: number;
     totalRevenueToday: number;
     totalSalesToday: number;
-    expiringBatches: {
-      id: string;
-      name: string;
-      batchNumber: string;
-      expiryDate: Date;
-      quantity: number;
-    }[];
+    expiryAlerts: {
+      critical: ExpiryAlertBatch[];
+      urgent: ExpiryAlertBatch[];
+      early: ExpiryAlertBatch[];
+    };
+    expirySettings: ExpirySettings;
     recentTransactions: {
       id: string;
       amount: number;
@@ -32,9 +33,9 @@ interface DashboardProps {
   };
 }
 
-import { AreaChart, Banknote, CalendarClock, Activity, AlertTriangle, ArrowUpRight, TrendingUp, Package } from "lucide-react";
+import { AreaChart, Banknote, Activity, AlertTriangle, ArrowUpRight, TrendingUp, Package } from "lucide-react";
 import Link from "next/link";
-import { formatDistanceToNow, format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 
 export default function Dashboard({ stats }: DashboardProps) {
   const isHealthyStock = stats.stockHealth > 0.6;
@@ -125,53 +126,14 @@ export default function Dashboard({ stats }: DashboardProps) {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-4">
-              {/* Left Column: Alerts & Expiring Soon */}
+              {/* Left Column: Expiry Alerts */}
               <div className="lg:col-span-2 space-y-6">
-                <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-                    <div className="border-b border-border/50 px-6 py-4 flex items-center justify-between bg-muted/20">
-                        <div className="flex items-center gap-2">
-                            <CalendarClock className="h-5 w-5 text-destructive" />
-                            <h3 className="font-semibold text-foreground">Critical Expiry Watchlist</h3>
-                        </div>
-                        <span className="text-xs font-medium px-2.5 py-1 bg-destructive/10 text-destructive rounded-full">
-                            {stats.expiringBatches.length} items within 30 days
-                        </span>
-                    </div>
-                    <div className="p-0">
-                        {stats.expiringBatches.length > 0 ? (
-                            <div className="divide-y divide-border/50">
-                                {stats.expiringBatches.map(batch => {
-                                    const isExpired = new Date(batch.expiryDate) < new Date();
-                                    return (
-                                        <div key={batch.id} className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors">
-                                            <div>
-                                                <p className="font-medium text-sm flex items-center gap-2">
-                                                    {batch.name}
-                                                    {isExpired && <span className="text-[9px] font-bold bg-destructive/20 text-destructive px-1.5 py-0.5 rounded uppercase tracking-wider">Expired</span>}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground mt-0.5">Batch: {batch.batchNumber} • Stock: {batch.quantity}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className={`text-sm font-medium ${isExpired ? 'text-destructive' : 'text-orange-500'}`}>
-                                                    {format(new Date(batch.expiryDate), 'MMM d, yyyy')}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground mt-0.5 whitespace-nowrap">
-                                                    {isExpired ? 'Past due' : `in ${formatDistanceToNow(new Date(batch.expiryDate))}`}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        ) : (
-                            <div className="p-8 text-center text-muted-foreground flex flex-col items-center">
-                                <span className="text-4xl mb-3">✨</span>
-                                <p className="text-sm">No medicines are expiring soon.</p>
-                                <p className="text-xs mt-1">Your inventory is safe!</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <ExpiryAlertsCard
+                  critical={stats.expiryAlerts.critical}
+                  urgent={stats.expiryAlerts.urgent}
+                  early={stats.expiryAlerts.early}
+                  settings={stats.expirySettings}
+                />
               </div>
 
               {/* Right Column: Recent Sales Activity */}

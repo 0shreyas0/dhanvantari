@@ -5,36 +5,49 @@ import MainLayout from "@/components/MainLayout";
 import InventoryTable from "@/components/InventoryTable";
 import { redirect } from "next/navigation";
 import { AddProductDialog } from "@/components/AddProductDialog";
-import { getPharmacySettings } from "@/actions/settings";
+import { getPharmacySettings, getExpirySettings } from "@/actions/settings";
+import { DEFAULT_EXPIRY_SETTINGS } from "@/lib/expiry";
 
 export default async function ProductsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const medicines = await prisma.medicine.findMany({
-    where: { userId },
-    include: {
-      batches: true,
-    }
-  });
+  const [medicines, settings, expirySettingsRaw] = await Promise.all([
+    prisma.medicine.findMany({
+      where: { userId },
+      include: { batches: true },
+    }),
+    getPharmacySettings(),
+    getExpirySettings(),
+  ]);
 
-  const settings = await getPharmacySettings();
   const pharmacyName = settings?.name || "Pharmacy";
+  const expirySettings = expirySettingsRaw
+    ? {
+        earlyWarningDays: expirySettingsRaw.earlyWarningDays,
+        urgentWarningDays: expirySettingsRaw.urgentWarningDays,
+        criticalDays: expirySettingsRaw.criticalDays,
+      }
+    : DEFAULT_EXPIRY_SETTINGS;
 
   const data = medicines.map(med => {
     const activeBatches = med.batches.filter(b => !b.isRecalled);
     const recalledBatches = med.batches.filter(b => b.isRecalled);
     
-    // Total stock from non-recalled items basically, or just show all but flag it.
     const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0);
-    const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0; 
-
-    // Find if the entire medicine line is compromised by a recall
+    const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0;
     const hasRecall = recalledBatches.length > 0;
-    
-    // Which batches to show in the pill
     const batches = med.batches.map(b => b.batchNumber).join(", ");
-    
+
+    // Earliest expiry across all IN-STOCK, non-recalled batches (FEFO)
+    const available = med.batches.filter(b => b.quantity > 0 && !b.isRecalled)
+    available.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+    const expiryDate = available.length > 0
+      ? available[0].expiryDate.toISOString()
+      : med.batches.length > 0
+        ? med.batches.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())[0].expiryDate.toISOString()
+        : null
+
     let status = "In Stock";
     if (hasRecall) {
         status = "Recalled";
@@ -52,9 +65,8 @@ export default async function ProductsPage() {
       stock,
       price,
       status,
-      // Pass the first batch ID randomly or just have a detail view...
-      // For simplicity let's pass the raw batches so InventoryTable can use them.
-      rawBatches: med.batches
+      expiryDate,
+      rawBatches: med.batches,
     };
   });
 
@@ -68,7 +80,7 @@ export default async function ProductsPage() {
             </div>
             <AddProductDialog />
         </div>
-        <InventoryTable data={data} pharmacyName={pharmacyName} />
+        <InventoryTable data={data} pharmacyName={pharmacyName} expirySettings={expirySettings} />
       </MainLayout>
     </PageContainer>
   );

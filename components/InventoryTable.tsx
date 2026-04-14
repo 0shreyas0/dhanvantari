@@ -18,24 +18,32 @@ import { useRouter } from "next/navigation"
 import { Download, FileUp, Loader2, Search, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ExpiryBadge } from "@/components/ExpiryBadge"
+import { ExpirySettings, DEFAULT_EXPIRY_SETTINGS } from "@/lib/expiry"
 
 interface Product {
-  id: string; 
-  name: string;
-  barcode: string;
-  batch: string;
-  stock: number;
-  price: number;
-  status: string;
-  rawBatches?: any[];
+  id: string
+  name: string
+  barcode: string
+  batch: string
+  stock: number
+  price: number
+  status: string
+  expiryDate?: string | null   // ISO string of earliest batch expiry
+  rawBatches?: any[]
 }
 
 interface InventoryTableProps {
-  data: Product[];
-  pharmacyName: string;
+  data: Product[]
+  pharmacyName: string
+  expirySettings?: ExpirySettings
 }
 
-export default function InventoryTable({ data, pharmacyName }: InventoryTableProps) {
+export default function InventoryTable({
+  data,
+  pharmacyName,
+  expirySettings = DEFAULT_EXPIRY_SETTINGS,
+}: InventoryTableProps) {
     const [searchQuery, setSearchQuery] = useState("")
     const [statusFilter, setStatusFilter] = useState("all")
     const router = useRouter()
@@ -60,10 +68,9 @@ export default function InventoryTable({ data, pharmacyName }: InventoryTablePro
                 return
             }
 
-            // Simple JSON to CSV converter
             const headers = Object.keys(data[0])
             const csvRows = [
-                headers.join(","), // header row
+                headers.join(","),
                 ...data.map(row => headers.map(fieldName => JSON.stringify(row[fieldName as keyof typeof row] || "")).join(","))
             ]
             const csvContent = csvRows.join("\n")
@@ -205,11 +212,12 @@ export default function InventoryTable({ data, pharmacyName }: InventoryTablePro
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[300px]">Medicine Name</TableHead>
+                <TableHead className="w-[220px]">Medicine Name</TableHead>
                 <TableHead>Barcode</TableHead>
                 <TableHead>Batch No</TableHead>
                 <TableHead>Stock</TableHead>
                 <TableHead>Price</TableHead>
+                <TableHead>Expiry</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
@@ -245,6 +253,16 @@ export default function InventoryTable({ data, pharmacyName }: InventoryTablePro
                     <TableCell>{med.stock}</TableCell>
                     <TableCell>₹{med.price.toFixed(2)}</TableCell>
                     <TableCell>
+                        {med.expiryDate ? (
+                          <ExpiryBadge
+                            expiryDate={med.expiryDate}
+                            settings={expirySettings}
+                          />
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                    </TableCell>
+                    <TableCell>
                         <Badge 
                         variant="outline" 
                         className={`
@@ -261,7 +279,7 @@ export default function InventoryTable({ data, pharmacyName }: InventoryTablePro
                 ))
               ) : (
                   <TableRow>
-                      <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                           No products found.
                       </TableCell>
                   </TableRow>
