@@ -301,7 +301,7 @@ export default function BillingPage() {
         if (context) {
           context.fillStyle = "white"
           context.fillRect(0, 0, canvas.width, canvas.height)
-          await page.render({ canvasContext: context, viewport }).promise
+          await page.render({ canvasContext: context, viewport, canvas } as any).promise
           const dataUrl = canvas.toDataURL("image/png")
           const blob = await (await fetch(dataUrl)).blob()
           fileToScan = new File([blob], "converted-pdf.png", { type: "image/png" })
@@ -367,7 +367,7 @@ export default function BillingPage() {
                           <TableCell className="font-medium">
                             <div className="flex flex-col gap-0.5">
                                 <span>{item.name}</span>
-                                <span className="text-xs text-muted-foreground">{item.barcode}</span>
+                                <span className="text-xs text-muted-foreground">{item.barcodes}</span>
                                 {item.isNearExpiry && (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-600/30 px-1.5 py-0.5 rounded w-fit">
                                     <AlertTriangle className="h-2.5 w-2.5" />
