@@ -1,7 +1,11 @@
 <div align="center">
   
+<img src="public/logo.png" alt="Dhanvantari Logo" width="150">
+
 # ⚕️ Dhanvantari
 ### Intelligent Pharmacy Inventory Management System
+
+🚀 **[Live Demo](https://dhanvantari-five.vercel.app)**
 
 [![Next.js](https://img.shields.io/badge/Next.js-15.0-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
