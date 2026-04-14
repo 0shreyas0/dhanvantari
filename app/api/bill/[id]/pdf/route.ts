@@ -67,7 +67,7 @@ export async function GET(
     const mediumFont = fs.existsSync(FONT_MEDIUM) ? fs.readFileSync(FONT_MEDIUM) : regularFont
 
     await new Promise<void>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: "A4", font: regularFont })
+      const doc = new PDFDocument({ margin: 50, size: "A4", font: regularFont as any })
 
       doc.registerFont("ReceiptRegular", regularFont)
       doc.registerFont("ReceiptMedium", mediumFont)
