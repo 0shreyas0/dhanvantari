@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createHmac, timingSafeEqual } from "crypto"
 import { prisma } from "@/lib/prisma"
 import PDFDocument from "pdfkit"
+import { getBillWithItems } from "@/lib/bill-storage"
 
 // -------------------------------------------------------------------
 // Utility: generate and verify HMAC tokens
@@ -38,12 +39,7 @@ export async function GET(
   }
 
   // 2. Fetch bill
-  const bill = await prisma.bill.findUnique({
-    where: { id },
-    include: {
-      items: { include: { medicine: true } },
-    },
-  })
+  const bill = await getBillWithItems(id)
 
   if (!bill) {
     return new NextResponse("Bill not found", { status: 404 })

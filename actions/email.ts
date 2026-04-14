@@ -74,7 +74,7 @@ export async function sendEmailReceipt(
             <tbody>
               ${itemsHtml}
             </tbody>
-            <tfoot>
+              <tfoot>
               <tr>
                 <td colspan="2" style="padding: 10px; text-align: right; color: #475569;">Subtotal:</td>
                 <td style="padding: 10px; text-align: right; color: #0f172a;">₹${totals.subtotalAmount.toFixed(2)}</td>

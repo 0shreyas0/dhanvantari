@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@clerk/nextjs/server"
 import Fuse from "fuse.js"
 import { generateEAN13 } from "@/lib/barcode"
-import { calculateBillSummaryFromItems } from "@/lib/billing"
+import { createBillWithItems, getBillWithItems } from "@/lib/bill-storage"
 
 export async function searchProducts(query: string) {
   if (!query) return []
@@ -130,26 +130,7 @@ export async function processBill(
     }
   }
 
-  const summary = calculateBillSummaryFromItems(items)
-
-  const bill = await prisma.bill.create({
-    data: {
-      userId,
-      customerName: customer?.name || null,
-      customerPhone: customer?.phone || null,
-      subtotalAmount: summary.subtotalAmount,
-      gstRate: summary.gstRate,
-      gstAmount: summary.gstAmount,
-      totalAmount: summary.totalAmount,
-      items: {
-        create: items.map(item => ({
-          medicineId: item.medicineId,
-          quantity: item.quantity,
-          price: item.price
-        }))
-      }
-    }
-  })
+  const bill = await createBillWithItems(userId, items, customer)
 
   // Deduct stock from batches (FEFO)
   for (const item of items) {
@@ -420,16 +401,7 @@ export async function getBillDetails(billId: string) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
 
-  const bill = await prisma.bill.findUnique({
-    where: { id: billId, userId },
-    include: {
-      items: {
-        include: {
-          medicine: true
-        }
-      }
-    }
-  })
+  const bill = await getBillWithItems(billId, userId)
 
   if (!bill) return null
 
