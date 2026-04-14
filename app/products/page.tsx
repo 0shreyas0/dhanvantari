@@ -73,6 +73,7 @@ export default async function ProductsPage() {
     return {
       id: med.id,
       name: med.name,
+      barcodes: med.batches.map(b => b.barcode).join(" "),
       category: med.category ?? null,
       description: med.description ?? null,
       totalStock,

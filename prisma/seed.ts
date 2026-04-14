@@ -19,7 +19,6 @@ async function main() {
     data: {
       userId: 'dummy_seed_user_123',
       name: 'Amoxicillin 500mg (Amoxil)',
-      barcode: '123456789012', // A mock 12-digit barcode for testing
       category: 'Antibiotics',
       description: 'Used to treat a wide variety of bacterial infections.',
       lowStockThreshold: 15,
@@ -27,6 +26,7 @@ async function main() {
       batches: {
         create: [
           {
+            barcode: '1234567890121',
             batchNumber: 'AMX-2026-A1',
             quantity: 50,
             costPrice: 4.5,
@@ -34,6 +34,7 @@ async function main() {
             expiryDate: new Date('2026-12-31T00:00:00.000Z'),
           },
           {
+            barcode: '1234567890122',
             batchNumber: 'AMX-2024-B2',
             quantity: 5,
             costPrice: 4.0,
@@ -50,7 +51,6 @@ async function main() {
     data: {
       userId: 'dummy_seed_user_123',
       name: 'Paracetamol 500mg (Dolo)',
-      barcode: '987654321098',
       category: 'Painkillers',
       description: 'Common pain reliever and fever reducer.',
       lowStockThreshold: 50,
@@ -58,6 +58,7 @@ async function main() {
       batches: {
         create: [
           {
+            barcode: '9876543210981',
             batchNumber: 'PARA-2027-X',
             quantity: 200,
             costPrice: 1.2,
@@ -73,7 +74,6 @@ async function main() {
     data: {
       userId: 'dummy_seed_user_123',
       name: 'Cetirizine 10mg (Zyrtec)',
-      barcode: '456123789012',
       category: 'Antihistamines',
       description: 'Allergy medication.',
       lowStockThreshold: 20,
@@ -81,6 +81,7 @@ async function main() {
       batches: {
         create: [
           {
+            barcode: '4561237890121',
             batchNumber: 'CET-2025-Y',
             quantity: 8, 
             costPrice: 2.0,
@@ -93,9 +94,9 @@ async function main() {
   })
 
   console.log(`Created 3 medicines:`)
-  console.log(`- ${med1.name} (Barcode: ${med1.barcode})`)
-  console.log(`- ${med2.name} (Barcode: ${med2.barcode})`)
-  console.log(`- ${med3.name} (Barcode: ${med3.barcode})`)
+  console.log(`- ${med1.name}`)
+  console.log(`- ${med2.name}`)
+  console.log(`- ${med3.name}`)
   
   console.log('Seeding finished.')
 }
