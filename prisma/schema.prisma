@@ -113,6 +113,7 @@ model PharmacySettings {
   name    String  @default("My Pharmacy")
   phone   String?
   address String?
+  logoUrl String? // Link to custom pharmacy logo
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

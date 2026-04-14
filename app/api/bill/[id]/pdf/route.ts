@@ -77,22 +77,63 @@ export async function GET(
       doc.on("end", resolve)
       doc.on("error", reject)
 
+      // ---- Pre-load Pharmacy Logo (if any) ----
+      let pharmacyLogoBuffer = null
+      if (settings?.logoUrl) {
+        try {
+          const res = await fetch(settings.logoUrl)
+          if (res.ok) {
+            pharmacyLogoBuffer = Buffer.from(await res.arrayBuffer())
+          }
+        } catch (e) {
+          console.error("Failed to fetch pharmacy logo:", e)
+        }
+      }
+
+      const dhanvantariLogo = fs.readFileSync(path.join(process.cwd(), "public/logo.png"))
+
       // ---- Branded Header Decoration ----
       doc.rect(0, 0, 595, 8).fillColor("#0f172a").fill()
 
-      // ---- Header ----
-      doc.moveDown(2)
+      // ---- Header Row (Logos + Name) ----
+      doc.moveDown(1.5)
+      const headerTop = doc.y
+
+      // Dhanvantari Brand Logo (Left)
+      try {
+        doc.image(dhanvantariLogo, 50, headerTop, { width: 35 })
+      } catch (e) { /* fallback if image invalid */ }
+
+      // Pharmacy Info (Center)
       doc
-        .fontSize(24)
+        .fontSize(22)
         .font("ReceiptBold")
         .fillColor("#0f172a")
-        .text(pharmacyName.toUpperCase(), { align: "center", characterSpacing: 1 })
+        .text(pharmacyName.toUpperCase(), 0, headerTop + 5, { align: "center", characterSpacing: 1 })
       
+      // Pharmacy Custom Logo (Right)
+      if (pharmacyLogoBuffer) {
+        try {
+          doc.image(pharmacyLogoBuffer, 510, headerTop, { width: 35 })
+        } catch (e) { /* ignore if invalid image */ }
+      }
+
+      doc.moveDown(0.2)
       doc
-        .fontSize(9)
+        .fontSize(8)
         .font("ReceiptMedium")
         .fillColor("#64748b")
         .text("OFFICIAL TAX RECEIPT", { align: "center", characterSpacing: 2 })
+
+      if (settings?.address || settings?.phone) {
+        doc.moveDown(0.3)
+        const storeDetails = [settings?.address, settings?.phone].filter(Boolean).join("  •  ")
+        doc
+          .fontSize(8)
+          .font("ReceiptRegular")
+          .fillColor("#94a3b8")
+          .text(storeDetails, { align: "center" })
+      }
       
       doc.moveDown(1.5)
 

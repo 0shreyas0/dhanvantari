@@ -31,6 +31,18 @@ export async function sendEmailReceipt(
     return { success: false, error: "Email credentials missing" }
   }
 
+  // Fetch store details
+  const { prisma } = await import("@/lib/prisma")
+  const { auth } = await import("@clerk/nextjs/server")
+  const { userId } = await auth()
+  
+  const settings = userId ? await prisma.pharmacySettings.findUnique({
+    where: { userId },
+  }) : null
+
+  const storeAddress = settings?.address || ""
+  const storePhone = settings?.phone || ""
+
   try {
     const itemsHtml = items.map(item => `
       <tr>
@@ -44,9 +56,24 @@ export async function sendEmailReceipt(
 
     const htmlContent = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;">
-        <div style="background-color: #0f172a; color: white; padding: 20px; text-align: center;">
-          <h1 style="margin: 0; font-size: 24px;">${pharmacyName}</h1>
-          <p style="margin: 5px 0 0 0; opacity: 0.8;">Digital Purchase Receipt</p>
+        <div style="background-color: #0f172a; color: white; padding: 25px 20px; text-align: center;">
+          <table width="100%" border="0" cellspacing="0" cellpadding="0">
+            <tr>
+              <td width="50" align="left">
+                <img src="${process.env.NEXT_PUBLIC_APP_URL}/logo.png" alt="Dhanvantari" style="height: 35px; width: auto; display: block;" />
+              </td>
+              <td align="center">
+                <h1 style="margin: 0; font-size: 20px; letter-spacing: 1px; color: #ffffff;">${pharmacyName.toUpperCase()}</h1>
+                <p style="margin: 4px 0 0 0; opacity: 0.7; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #ffffff;">Digital Purchase Receipt</p>
+              </td>
+              <td width="50" align="right">
+                ${settings?.logoUrl ? `
+                  <img src="${settings.logoUrl}" alt="Store Logo" style="height: 35px; width: auto; border-radius: 4px; display: block;" />
+                ` : '<div style="width: 35px;"></div>'}
+              </td>
+            </tr>
+          </table>
+          ${storeAddress ? `<p style="margin: 15px 0 0 0; font-size: 11px; opacity: 0.6; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; color: #ffffff;">${storeAddress}${storePhone ? ` &bull; ${storePhone}` : ''}</p>` : ''}
         </div>
         <div style="padding: 30px;">
           <div style="text-align: center; margin-bottom: 30px;">

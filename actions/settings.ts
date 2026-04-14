@@ -26,7 +26,7 @@ export async function getPharmacySettings() {
   return settings
 }
 
-export async function updatePharmacySettings(data: { name: string; phone?: string; address?: string }) {
+export async function updatePharmacySettings(data: { name: string; phone?: string; address?: string; logoUrl?: string }) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
 
@@ -35,13 +35,15 @@ export async function updatePharmacySettings(data: { name: string; phone?: strin
     update: {
       name: data.name,
       phone: data.phone,
-      address: data.address
+      address: data.address,
+      logoUrl: data.logoUrl
     },
     create: {
       userId,
       name: data.name,
       phone: data.phone,
-      address: data.address
+      address: data.address,
+      logoUrl: data.logoUrl
     }
   })
 

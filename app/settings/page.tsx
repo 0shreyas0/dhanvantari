@@ -15,7 +15,7 @@ export default function SettingsPage() {
   // ── Pharmacy settings ────────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [formData, setFormData] = useState({ name: "My Pharmacy", phone: "", address: "" })
+  const [formData, setFormData] = useState({ name: "My Pharmacy", phone: "", address: "", logoUrl: "" })
 
   // ── Expiry settings ──────────────────────────────────────────────────────────
   const [isExpiryLoading, setIsExpiryLoading] = useState(true)
@@ -32,7 +32,12 @@ export default function SettingsPage() {
       try {
         const [settings, expiry] = await Promise.all([getPharmacySettings(), getExpirySettings()])
         if (settings) {
-          setFormData({ name: settings.name || "My Pharmacy", phone: settings.phone || "", address: settings.address || "" })
+          setFormData({ 
+            name: settings.name || "My Pharmacy", 
+            phone: settings.phone || "", 
+            address: settings.address || "",
+            logoUrl: settings.logoUrl || ""
+          })
         }
         if (expiry) {
           setExpiryForm({
@@ -130,7 +135,7 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>
-                This information will be printed on your thermal barcode stickers.
+                Your pharmacy branding and identity for receipts.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex-1">
@@ -141,10 +146,27 @@ export default function SettingsPage() {
               ) : (
                 <form onSubmit={handleSubmit} className="flex flex-col h-full space-y-6">
                   <div className="flex-1 space-y-6">
+                    <div className="space-y-4 pt-2">
+                       <div className="flex items-center gap-4">
+                          <div className="h-16 w-16 rounded-xl border-2 border-dashed border-border/60 bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                             {formData.logoUrl ? (
+                               <img src={formData.logoUrl} alt="Store Logo" className="h-full w-full object-contain" />
+                             ) : (
+                               <Store className="h-8 w-8 text-muted-foreground opacity-30" />
+                             )}
+                          </div>
+                          <div className="space-y-1.5 flex-1">
+                             <Label htmlFor="logoUrl">Pharmacy Logo URL</Label>
+                             <Input id="logoUrl" name="logoUrl" value={formData.logoUrl} onChange={handleChange} placeholder="https://example.com/logo.png" className="h-9" />
+                             <p className="text-[10px] text-muted-foreground">Provide a link to your pharmacy logo (square works best).</p>
+                          </div>
+                       </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="name">Pharmacy Name</Label>
                       <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. New Bhavani Medical" required />
-                      <p className="text-xs text-muted-foreground">Keep it short so it fits on a 2-inch sticker.</p>
+                      <p className="text-xs text-muted-foreground">This name appears at the top of every bill.</p>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="phone">Phone Number (Optional)</Label>

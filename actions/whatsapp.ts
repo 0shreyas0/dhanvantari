@@ -27,6 +27,18 @@ export async function sendWhatsAppReceipt(
     return { success: false, error: "Twilio credentials missing" }
   }
 
+  // Fetch store details
+  const { prisma } = await import("@/lib/prisma")
+  const { auth } = await import("@clerk/nextjs/server")
+  const { userId } = await auth()
+  
+  const settings = userId ? await prisma.pharmacySettings.findUnique({
+    where: { userId },
+  }) : null
+
+  const storeAddress = settings?.address || ""
+  const storePhone = settings?.phone || ""
+
   try {
     const itemsList = items.map(item => 
       `• ${item.name} x ${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}`
@@ -35,6 +47,7 @@ export async function sendWhatsAppReceipt(
     const pdfUrl = getSignedPdfUrl(billId);
 
     const messageBody = `*${pharmacyName.toUpperCase()} - DIGI RECEIPT*\n` +
+      `${storeAddress ? `_${storeAddress}${storePhone ? ` • ${storePhone}` : ''}_\n` : ''}` +
       `--------------------------\n` +
       `*Customer:* ${customerName || 'Valued Customer'}\n` +
       `*Receipt ID:* ${billId.slice(-6).toUpperCase()}\n` +
