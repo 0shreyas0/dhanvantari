@@ -118,6 +118,7 @@ export function AddProductDialog() {
               min={0}
               value={form.lowStockThreshold}
               onChange={handleChange}
+              onFocus={(e) => e.currentTarget.select()}
             />
             <p className="text-xs text-muted-foreground">
               You'll be alerted when total stock drops below this number.

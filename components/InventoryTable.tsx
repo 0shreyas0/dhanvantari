@@ -10,6 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -25,7 +33,17 @@ import {
   ChevronRight,
   ChevronDown,
   Layers,
+  Table as TableIcon,
+  Globe,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { ExpiryBadge } from "@/components/ExpiryBadge"
 import { ExpirySettings, DEFAULT_EXPIRY_SETTINGS } from "@/lib/expiry"
@@ -95,7 +113,55 @@ export default function InventoryTable({
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [isExporting, setIsExporting] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isGSheetModalOpen, setIsGSheetModalOpen] = useState(false)
+  const [gsheetUrl, setGsheetUrl] = useState("")
+  const [isGSheetLoading, setIsGSheetLoading] = useState(false)
   const router = useRouter()
+
+  const handleGSheetImport = async () => {
+    if (!gsheetUrl.includes("docs.google.com/spreadsheets")) {
+      toast.error("Please enter a valid Google Sheets URL")
+      return
+    }
+
+    setIsGSheetLoading(true)
+    try {
+      // Convert standard URL to CSV export URL
+      // Pattern: /d/ID/edit... -> /d/ID/export?format=csv
+      let exportUrl = gsheetUrl
+      if (gsheetUrl.includes("/edit")) {
+        exportUrl = gsheetUrl.split("/edit")[0] + "/export?format=csv"
+      } else if (!gsheetUrl.includes("/export")) {
+        exportUrl = gsheetUrl.replace(/\/$/, "") + "/export?format=csv"
+      }
+
+      const response = await fetch(exportUrl)
+      if (!response.ok) throw new Error("Failed to fetch sheet. Ensure it is shared as 'Anyone with the link can view'.")
+      
+      const csvText = await response.text()
+      const lines = csvText.split("\n")
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""))
+      
+      const parsedRows = lines.slice(1).filter(line => line.trim()).map(line => {
+        const values = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""))
+        const row: any = {}
+        headers.forEach((h, i) => { row[h] = values[i] })
+        return row
+      })
+
+      const result = await importInventoryFromCSV(parsedRows)
+      if (result.success) {
+        toast.success(`Imported ${result.successCount} items from Google Sheets!`)
+        setIsGSheetModalOpen(false)
+        setGsheetUrl("")
+        router.refresh()
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to import from Google Sheets. Is the sheet public?")
+    } finally {
+      setIsGSheetLoading(false)
+    }
+  }
 
   const toggleExpand = (id: string) =>
     setExpanded(prev => {
@@ -191,21 +257,55 @@ export default function InventoryTable({
           <CardTitle className="text-lg font-medium">Inventory List</CardTitle>
           <div className="flex items-center gap-3">
             <div className="flex gap-1">
-              <Button variant="outline" size="sm" className="h-9 gap-2" onClick={handleExport} disabled={isExporting}>
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Export
-              </Button>
-              <div className="relative">
-                <Button
-                  variant="outline" size="sm" className="h-9 gap-2"
-                  disabled={isImporting}
-                  onClick={() => document.getElementById("csv-upload")?.click()}
-                >
-                  {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                  Import
-                </Button>
-                <input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={handleImport} />
-              </div>
+              {/* Export Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-2" disabled={isExporting}>
+                    {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    Export
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExport} className="gap-2">
+                    <TableIcon className="h-4 w-4 text-muted-foreground" />
+                    Download as .CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    handleExport()
+                    setTimeout(() => window.open("https://sheets.new", "_blank"), 1000)
+                  }} className="gap-2">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    Export to Google Sheets
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Import Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 gap-2" disabled={isImporting}>
+                    {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                    Import
+                    <ChevronDown className="h-3 w-3 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Import Source</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => document.getElementById("csv-upload")?.click()} className="gap-2">
+                    <TableIcon className="h-4 w-4 text-muted-foreground" />
+                    Local .CSV File
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsGSheetModalOpen(true)} className="gap-2">
+                    <Globe className="h-4 w-4 text-muted-foreground" />
+                    Google Sheets Link
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={handleImport} />
             </div>
             <div className="h-6 w-px bg-border mx-1" />
             <div className="relative w-64">
@@ -237,14 +337,14 @@ export default function InventoryTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-8" />
-              <TableHead className="w-[300px]">Medicine Name</TableHead>
-              <TableHead>Batches</TableHead>
-              <TableHead>Total Stock</TableHead>
-              <TableHead>Price (FEFO)</TableHead>
-              <TableHead>Nearest Expiry</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[120px]" />
+              <TableHead className="w-12 text-center text-[10px] font-bold px-0">#</TableHead>
+              <TableHead className="w-[150px]">Medicine Name</TableHead>
+              <TableHead className="w-[220px]">Batches / Barcode</TableHead>
+              <TableHead className="w-[90px]">Stock</TableHead>
+              <TableHead className="w-[110px]">Price (FEFO)</TableHead>
+              <TableHead className="w-[160px]">Nearest Expiry</TableHead>
+              <TableHead className="w-[140px]">Status</TableHead>
+              <TableHead className="w-[80px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -258,7 +358,7 @@ export default function InventoryTable({
                       className="hover:bg-muted/50 transition-colors cursor-pointer"
                       onClick={() => toggleExpand(med.id)}
                     >
-                      <TableCell className="pr-0">
+                      <TableCell className="text-center px-0">
                         <button className="p-1 rounded hover:bg-muted transition-colors">
                           {isOpen
                             ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -290,8 +390,8 @@ export default function InventoryTable({
                           <span className="text-sm">{med.batches.length} batch{med.batches.length !== 1 ? "es" : ""}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-lg">{med.totalStock} <span className="text-[10px] text-muted-foreground font-normal">UNITS</span></TableCell>
-                      <TableCell>₹{med.price.toFixed(2)}</TableCell>
+                      <TableCell className="font-medium text-lg leading-none">{med.totalStock}</TableCell>
+                      <TableCell className="font-medium">₹{med.price.toFixed(2)}</TableCell>
                       <TableCell>
                         {med.expiryDate
                           ? <ExpiryBadge expiryDate={med.expiryDate} settings={expirySettings} />
@@ -332,18 +432,17 @@ export default function InventoryTable({
                           className="bg-muted/30 hover:bg-muted/50 transition-colors border-l-2 border-primary/30"
                           onClick={e => e.stopPropagation()}
                         >
-                          <TableCell />
-                          <TableCell className="text-xs pl-4 font-mono">
-                             <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">BATCH #{idx + 1}</span>
-                                <span className="font-bold text-foreground">{batch.batchNumber}</span>
-                             </div>
+                          <TableCell className="text-center px-0 opacity-40">
+                             <span className="text-[11px] font-mono font-bold">
+                                {(idx + 1).toString().padStart(2, '0')}
+                             </span>
+                          </TableCell>
+                          <TableCell className="text-xs font-mono font-bold text-foreground">
+                             {batch.batchNumber}
                           </TableCell>
                           <TableCell className="font-mono text-xs">
-                             <div className="flex flex-col">
-                                <span className="text-[10px] text-muted-foreground uppercase">Barcode</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-foreground">{batch.barcode}</span>
+                             <div className="flex items-center gap-2">
+                                <span className="text-foreground">{batch.barcode}</span>
                                     <PrintBarcodeButton
                                         pharmacyName={pharmacyName}
                                         medicineName={med.name}
@@ -352,10 +451,11 @@ export default function InventoryTable({
                                         batch={batch.batchNumber}
                                     />
                                 </div>
-                             </div>
                           </TableCell>
-                          <TableCell className="text-sm font-medium">{batch.quantity} units</TableCell>
-                          <TableCell>₹{batch.sellingPrice.toFixed(2)}</TableCell>
+                          <TableCell className="font-medium text-xs text-muted-foreground">
+                             <span className="font-mono">{batch.quantity}</span>
+                          </TableCell>
+                          <TableCell className="text-sm font-semibold">₹{batch.sellingPrice.toFixed(2)}</TableCell>
                           <TableCell>
                             <ExpiryBadge expiryDate={batch.expiryDate} settings={expirySettings} />
                           </TableCell>
@@ -388,6 +488,41 @@ export default function InventoryTable({
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={isGSheetModalOpen} onOpenChange={setIsGSheetModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Import from Google Sheets</DialogTitle>
+            <DialogDescription>
+              Paste the public link to your Google Sheet. Ensure the sheet is shared as 
+              <strong> "Anyone with the link can view"</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="gsheet-url" className="text-sm font-medium">Sheet URL</label>
+              <Input
+                id="gsheet-url"
+                placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+                value={gsheetUrl}
+                onChange={(e) => setGsheetUrl(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="text-[11px] text-muted-foreground bg-muted/50 p-2 rounded border border-border/50">
+              <p className="font-bold mb-1">💡 Pro-tip:</p>
+              The first row of your sheet must contain headers like "Medicine Name", "Stock", "Selling Price", etc., to match our system.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsGSheetModalOpen(false)}>Cancel</Button>
+            <Button onClick={handleGSheetImport} disabled={isGSheetLoading || !gsheetUrl}>
+              {isGSheetLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Globe className="h-4 w-4 mr-2" />}
+              Start Import
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

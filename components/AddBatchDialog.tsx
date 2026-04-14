@@ -166,9 +166,9 @@ export function AddBatchDialog({ medicineId, medicineName }: AddBatchDialogProps
                   value={form.barcode}
                   onChange={handleChange}
                   placeholder="Generating..."
-                  className="font-mono text-xs tracking-[0.1em] h-11 bg-slate-900/80 border-slate-700/50 text-slate-200 font-bold cursor-not-allowed text-center focus-visible:ring-0"
-                  readOnly
+                  className="font-mono text-xs tracking-[0.1em] h-11 bg-slate-900/80 border-slate-700/50 text-slate-200 font-bold text-center focus-visible:ring-1 focus-visible:ring-primary/30"
                   tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.select()}
                 />
               </div>
 
@@ -178,9 +178,9 @@ export function AddBatchDialog({ medicineId, medicineName }: AddBatchDialogProps
                   id="batchNumber" name="batchNumber"
                   value={form.batchNumber}
                   onChange={handleChange}
-                  className="font-mono text-xs tracking-[0.1em] h-11 bg-slate-900/80 border-slate-700/50 text-slate-200 font-bold cursor-not-allowed text-center focus-visible:ring-0"
-                  readOnly
+                  className="font-mono text-xs tracking-[0.1em] h-11 bg-slate-900/80 border-slate-700/50 text-slate-200 font-bold text-center focus-visible:ring-1 focus-visible:ring-primary/30"
                   tabIndex={-1}
+                  onFocus={(e) => e.currentTarget.select()}
                   required
                 />
               </div>
@@ -210,6 +210,7 @@ export function AddBatchDialog({ medicineId, medicineName }: AddBatchDialogProps
                 onChange={handleChange}
                 className="h-11"
                 required
+                onFocus={(e) => e.currentTarget.select()}
               />
             </div>
           </div>
@@ -226,6 +227,7 @@ export function AddBatchDialog({ medicineId, medicineName }: AddBatchDialogProps
                 value={form.costPrice}
                 onChange={handleChange}
                 className="h-11 bg-muted/20"
+                onFocus={(e) => e.currentTarget.select()}
               />
             </div>
             <div className="grid gap-2">
@@ -237,6 +239,7 @@ export function AddBatchDialog({ medicineId, medicineName }: AddBatchDialogProps
                 onChange={handleChange}
                 className="h-11 font-bold text-primary"
                 required
+                onFocus={(e) => e.currentTarget.select()}
               />
             </div>
           </div>

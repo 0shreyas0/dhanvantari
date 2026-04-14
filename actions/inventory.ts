@@ -497,16 +497,18 @@ export async function exportInventoryToCSV() {
   // Flatten the data for CSV
   const rows = medicines.flatMap(med => {
       if (med.batches.length === 0) {
-          return [{
-              "Medicine Name": med.name,
-              "Barcode": "N/A",
-              "Category": med.category || "",
-              "Batch No.": "N/A",
-              "Stock": 0,
-              "Selling Price": 0,
-              "Expiry Date": "N/A",
-              "Status": "Out of Stock"
-          }]
+              return [{
+                  "Medicine Name": med.name,
+                  "Barcode": "N/A",
+                  "Category": med.category || "",
+                  "Description": med.description || "",
+                  "Batch No.": "N/A",
+                  "Stock": 0,
+                  "Cost Price": 0,
+                  "Selling Price": 0,
+                  "Expiry Date": "N/A",
+                  "Status": "Out of Stock"
+              }]
       }
       
       return med.batches.map(batch => {
@@ -515,8 +517,10 @@ export async function exportInventoryToCSV() {
               "Medicine Name": med.name,
               "Barcode": batch.barcode,
               "Category": med.category || "",
+              "Description": med.description || "",
               "Batch No.": batch.batchNumber,
               "Stock": batch.quantity,
+              "Cost Price": batch.costPrice,
               "Selling Price": batch.sellingPrice,
               "Expiry Date": new Date(batch.expiryDate).toLocaleDateString(),
               "Status": isExpired ? "Expired" : (batch.quantity === 0 ? "Out of Stock" : "In Stock")
@@ -540,7 +544,8 @@ export async function importInventoryFromCSV(rows: any[]) {
       const barcode = row["Barcode"]
       const batchNumber = row["Batch No."] || "B-001"
       const quantity = parseInt(row["Stock"]) || 0
-      const price = parseFloat(row["Selling Price"]) || 0
+      const sellingPrice = parseFloat(row["Selling Price"]) || 0
+      const costPrice = row["Cost Price"] ? parseFloat(row["Cost Price"]) : sellingPrice * 0.8
       const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : new Date(Date.now() + 365*24*60*60*1000)
 
       if (!name || !barcode) continue
@@ -557,7 +562,8 @@ export async function importInventoryFromCSV(rows: any[]) {
                   data: {
                       name,
                       userId,
-                      category: row["Category"] || ""
+                      category: row["Category"] || "",
+                      description: row["Description"] || ""
                   }
               })
           }
@@ -569,8 +575,8 @@ export async function importInventoryFromCSV(rows: any[]) {
                   barcode,
                   batchNumber,
                   quantity,
-                  sellingPrice: price,
-                  costPrice: price * 0.8, // Estimate cost if not provided
+                  sellingPrice: sellingPrice,
+                  costPrice: costPrice,
                   expiryDate: expiry
               }
           })

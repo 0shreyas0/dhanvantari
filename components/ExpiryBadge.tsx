@@ -14,57 +14,40 @@ export function ExpiryBadge({ expiryDate, settings = DEFAULT_EXPIRY_SETTINGS }: 
   const status = getExpiryStatus(date, settings)
   const dateStr = format(date, "yyyy-MM-dd")
 
-  const tooltipText =
-    status.daysRemaining < 0
-      ? `Expired ${Math.abs(status.daysRemaining)} day${Math.abs(status.daysRemaining) === 1 ? '' : 's'} ago`
-      : status.daysRemaining === 0
-        ? "Expires today!"
-        : `${status.daysRemaining} days remaining`
+  // Simplified Label for the badge
+  const shortLabel = status.label
+    .replace("Expires in ", "")
+    .replace(" day", "d")
+    .replace("s", "")
+    .replace("OK", "SAFE")
 
-  // Class map per color
-  const colorClasses: Record<string, string> = {
-    green:
-      "border-green-200 text-green-700 dark:text-green-400 dark:border-green-500/30 bg-green-50/50 dark:bg-green-900/10",
-    yellow:
-      "bg-yellow-50 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-600/40",
-    orange:
-      "bg-orange-500 border-orange-500 text-white dark:bg-orange-600 dark:border-orange-600",
-    red: "", // Handled by destructive variant below
-    gray:
-      "bg-muted/60 text-muted-foreground border-border line-through decoration-muted-foreground/60",
+  const s = status.color
+
+  const colorStyles: Record<string, string> = {
+    green:  "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400",
+    yellow: "bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400",
+    orange: "bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400",
+    red:    "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400 font-bold",
+    gray:   "bg-muted/10 border-border/50 text-muted-foreground/50",
   }
 
-  const variant =
-    status.color === "red"
-      ? "destructive"
-      : "outline"
-
   return (
-    <div className="relative group inline-flex">
+    <div className="inline-flex items-center gap-1.5 group relative cursor-default">
+      {/* Date Part */}
+      <div className={`h-6 flex items-center px-1.5 rounded-md border border-border/40 bg-muted/5 transition-colors group-hover:bg-muted/10`}>
+        <span className={`font-mono text-[11px] font-bold ${s === "gray" ? "line-through opacity-30 text-muted-foreground" : "text-foreground/70"}`}>
+          {dateStr}
+        </span>
+      </div>
+
+      {/* Status Part — Hover only */}
       <Badge
-        variant={variant}
-        className={`text-xs font-normal gap-1 ${status.color !== "red" ? colorClasses[status.color] : ""}`}
+        variant="outline"
+        className={`h-5 px-1.5 text-[9px] font-black uppercase tracking-wider border rounded-[4px] shadow-none transition-all duration-200 opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 ${colorStyles[s]}`}
       >
-        <span className={status.color === "gray" ? "line-through" : ""}>{dateStr}</span>
-        <span className="opacity-60">·</span>
-        <span>{status.label}</span>
+        {shortLabel}
       </Badge>
 
-      {/* Hover tooltip */}
-      <div
-        className="
-          absolute bottom-full left-1/2 -translate-x-1/2 mb-2
-          px-2.5 py-1.5 rounded-md bg-popover border border-border
-          text-xs font-medium text-popover-foreground shadow-md
-          whitespace-nowrap pointer-events-none z-50
-          opacity-0 group-hover:opacity-100
-          transition-opacity duration-150
-        "
-      >
-        {tooltipText}
-        {/* Arrow */}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
-      </div>
     </div>
   )
 }

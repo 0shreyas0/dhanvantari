@@ -406,15 +406,15 @@ export default function BillingPage() {
                 <div className="grid grid-cols-2 gap-4 border-b border-border/40 pb-4">
                   <div>
                     <Label htmlFor="customerName" className="text-xs text-muted-foreground mb-1.5 block">Customer Name (Optional)</Label>
-                    <Input id="customerName" placeholder="e.g. Rahul Patil" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="bg-background" />
+                    <Input id="customerName" placeholder="e.g. Rahul Patil" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
                   </div>
                   <div>
                     <Label htmlFor="customerPhone" className="text-xs text-muted-foreground mb-1.5 block">Phone Number (Optional)</Label>
-                    <Input id="customerPhone" placeholder="e.g. 9876543210" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-background" />
+                    <Input id="customerPhone" placeholder="e.g. 9876543210" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
                   </div>
                   <div className="col-span-2 mt-2">
                     <Label htmlFor="customerEmail" className="text-xs text-muted-foreground mb-1.5 block">Email Address (Optional)</Label>
-                    <Input id="customerEmail" type="email" placeholder="e.g. customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="bg-background" />
+                    <Input id="customerEmail" type="email" placeholder="e.g. customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
                   </div>
                 </div>
 
@@ -453,6 +453,7 @@ export default function BillingPage() {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pl-9 h-10 w-full"
+                        onFocus={(e) => e.currentTarget.select()}
                       />
                     </div>
 
