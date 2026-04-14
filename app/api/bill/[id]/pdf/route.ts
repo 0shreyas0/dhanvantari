@@ -62,17 +62,16 @@ export async function GET(
 
     // 3. Generate PDF in memory
     const chunks: Buffer[] = []
+    const regularFont = fs.readFileSync(FONT_REGULAR)
+    const boldFont = fs.readFileSync(FONT_BOLD)
+    const mediumFont = fs.existsSync(FONT_MEDIUM) ? fs.readFileSync(FONT_MEDIUM) : regularFont
 
     await new Promise<void>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50, size: "A4" })
+      const doc = new PDFDocument({ margin: 50, size: "A4", font: regularFont })
 
-      if (!fs.existsSync(FONT_REGULAR) || !fs.existsSync(FONT_BOLD)) {
-        throw new Error(`Missing PDF fonts at ${FONT_REGULAR} or ${FONT_BOLD}`)
-      }
-
-      doc.registerFont("ReceiptRegular", FONT_REGULAR)
-      doc.registerFont("ReceiptMedium", fs.existsSync(FONT_MEDIUM) ? FONT_MEDIUM : FONT_REGULAR)
-      doc.registerFont("ReceiptBold", FONT_BOLD)
+      doc.registerFont("ReceiptRegular", regularFont)
+      doc.registerFont("ReceiptMedium", mediumFont)
+      doc.registerFont("ReceiptBold", boldFont)
 
       doc.on("data", (chunk: Buffer) => chunks.push(chunk))
       doc.on("end", resolve)
