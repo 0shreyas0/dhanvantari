@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createHmac, timingSafeEqual } from "crypto"
+import fs from "fs"
+import path from "path"
 import { prisma } from "@/lib/prisma"
 import PDFDocument from "pdfkit"
 import { getBillWithItems } from "@/lib/bill-storage"
@@ -11,6 +13,9 @@ export const dynamic = "force-dynamic"
 // Utility: generate and verify HMAC tokens
 // -------------------------------------------------------------------
 const PDF_SECRET = process.env.PDF_SECRET || "fallback_secret"
+const FONT_REGULAR = path.join(process.cwd(), "app/fonts/GoogleSans-Regular.ttf")
+const FONT_MEDIUM = path.join(process.cwd(), "app/fonts/GoogleSans-Medium.ttf")
+const FONT_BOLD = path.join(process.cwd(), "app/fonts/GoogleSans-Bold.ttf")
 
 export function generatePdfToken(billId: string): string {
   return createHmac("sha256", PDF_SECRET).update(billId).digest("hex")
@@ -61,6 +66,14 @@ export async function GET(
     await new Promise<void>((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4" })
 
+      if (!fs.existsSync(FONT_REGULAR) || !fs.existsSync(FONT_BOLD)) {
+        throw new Error(`Missing PDF fonts at ${FONT_REGULAR} or ${FONT_BOLD}`)
+      }
+
+      doc.registerFont("ReceiptRegular", FONT_REGULAR)
+      doc.registerFont("ReceiptMedium", fs.existsSync(FONT_MEDIUM) ? FONT_MEDIUM : FONT_REGULAR)
+      doc.registerFont("ReceiptBold", FONT_BOLD)
+
       doc.on("data", (chunk: Buffer) => chunks.push(chunk))
       doc.on("end", resolve)
       doc.on("error", reject)
@@ -68,11 +81,11 @@ export async function GET(
       // ---- Header ----
       doc
         .fontSize(22)
-        .font("Helvetica-Bold")
+        .font("ReceiptBold")
         .text(pharmacyName.toUpperCase(), { align: "center" })
       doc
         .fontSize(10)
-        .font("Helvetica")
+        .font("ReceiptRegular")
         .fillColor("#555")
         .text("Official Tax Receipt - Digitized by Dhanvantari", { align: "center" })
       doc.moveDown()
@@ -87,10 +100,11 @@ export async function GET(
 
       // ---- Bill Meta ----
       const metaY = doc.y
-      doc.fontSize(10).fillColor("#333")
+      doc.font("ReceiptRegular").fontSize(10).fillColor("#333")
       doc.text(`Bill To: ${bill.customerName || "Valued Customer"}`, 50, metaY)
       doc.text(`Phone: ${bill.customerPhone || "-"}`, 50)
       doc
+        .font("ReceiptRegular")
         .fontSize(10)
         .text(`Receipt ID: #${bill.id.slice(-8).toUpperCase()}`, 350, metaY, {
           align: "right",
@@ -118,7 +132,7 @@ export async function GET(
 
       doc
         .fontSize(10)
-        .font("Helvetica-Bold")
+        .font("ReceiptBold")
         .fillColor("white")
         .text("Medicine", 60, tableTop + 5, { width: 220 })
         .text("Qty", 280, tableTop + 5, { width: 70, align: "center" })
@@ -127,7 +141,7 @@ export async function GET(
 
       // ---- Items ----
       let rowY = tableTop + 25
-      doc.font("Helvetica").fillColor("#333").fontSize(10)
+      doc.font("ReceiptRegular").fillColor("#333").fontSize(10)
 
       bill.items.forEach((item, i) => {
         const rowBg = i % 2 === 0 ? "#f8fafc" : "#ffffff"
@@ -156,7 +170,7 @@ export async function GET(
 
       doc
         .fontSize(10)
-        .font("Helvetica")
+        .font("ReceiptRegular")
         .fillColor("#334155")
         .text(`Subtotal: \u20b9${bill.subtotalAmount.toFixed(2)}`, 50, rowY + 18, {
           align: "right",
@@ -167,7 +181,7 @@ export async function GET(
 
       doc
         .fontSize(14)
-        .font("Helvetica-Bold")
+        .font("ReceiptBold")
         .fillColor("#0f172a")
         .text(`Total Paid: \u20b9${bill.totalAmount.toFixed(2)}`, 50, rowY + 56, {
           align: "right",
@@ -176,7 +190,7 @@ export async function GET(
       // ---- Footer ----
       doc
         .fontSize(8)
-        .font("Helvetica")
+        .font("ReceiptRegular")
         .fillColor("#94a3b8")
         .text(
           "This is a computer-generated receipt and is valid without a signature. Powered by Dhanvantari.",
