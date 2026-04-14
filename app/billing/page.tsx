@@ -30,7 +30,7 @@ import { DEFAULT_EXPIRY_SETTINGS, ExpirySettings } from "@/lib/expiry"
 interface Product {
   id: string
   name: string
-  barcode: string
+  barcodes: string // Combined string of all batch barcodes
   stock: number
   price: number
   isExpired?: boolean
@@ -69,6 +69,7 @@ export default function BillingPage() {
   const [isSendingWa, setIsSendingWa] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
+  const [lastCustomerEmail, setLastCustomerEmail] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Debounce ref for barcode scanner
@@ -112,9 +113,12 @@ export default function BillingPage() {
     try {
       const results = await searchProducts(decodedText)
       if (results.length > 0) {
-        const exactMatch = results.find(p => p.barcode === decodedText)
+        // Find if any result contains our scanned barcode in its barcodes string
+        const exactMatch = (results as Product[]).find(p => 
+          p.barcodes && p.barcodes.split(" ").some(bc => bc === decodedText)
+        )
         if (exactMatch) addToBill(exactMatch)
-        else setSearchResults(results)
+        else setSearchResults(results as Product[])
       }
     } finally {
       setIsSearching(false)
@@ -195,6 +199,7 @@ export default function BillingPage() {
         const details = await getBillDetails(result.billId)
         setLastBill(details)
         setNearExpiryCount(billItems.filter(i => i.isNearExpiry).length)
+        setLastCustomerEmail(customerEmail) // Preserve email for success dialog before clearing
         setShowSuccessDialog(true)
         setBillItems([])
         setCustomerName("")
@@ -242,14 +247,14 @@ export default function BillingPage() {
   }
 
   const handleEmailShare = async () => {
-    if (!lastBill || !customerEmail) {
+    if (!lastBill || !lastCustomerEmail) {
         toast.error("Please provide a valid email address.")
         return
     }
     setIsSendingEmail(true)
     try {
       const result = await sendEmailReceipt(
-        customerEmail,
+        lastCustomerEmail,
         lastBill.customerName || "Customer",
         lastBill.id,
         lastBill.totalAmount,
@@ -597,7 +602,7 @@ export default function BillingPage() {
                 {isSendingWa ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4 text-green-600" />}
                 {isSendingWa ? "Sending..." : "Send WhatsApp"}
               </Button>
-              <Button variant="outline" className="flex-1 gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-800/20" disabled={isSendingEmail || !customerEmail} onClick={handleEmailShare}>
+              <Button variant="outline" className="flex-1 gap-2 border-blue-200 hover:bg-blue-50 dark:border-blue-800/20" disabled={isSendingEmail || !lastCustomerEmail} onClick={handleEmailShare}>
                 {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4 text-blue-600" />}
                 {isSendingEmail ? "Sending..." : "Send Email"}
               </Button>

@@ -124,36 +124,38 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
           {/* ── Basic Information ──────────────────────────────────────────────── */}
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
               <CardTitle>Basic Information</CardTitle>
               <CardDescription>
                 This information will be printed on your thermal barcode stickers.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               {isLoading ? (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Pharmacy Name</Label>
-                    <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. New Bhavani Medical" required />
-                    <p className="text-xs text-muted-foreground">Keep it short so it fits on a 2-inch sticker.</p>
+                <form onSubmit={handleSubmit} className="flex flex-col h-full space-y-6">
+                  <div className="flex-1 space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Pharmacy Name</Label>
+                      <Input id="name" name="name" value={formData.name} onChange={handleChange} placeholder="e.g. New Bhavani Medical" required />
+                      <p className="text-xs text-muted-foreground">Keep it short so it fits on a 2-inch sticker.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Phone Number (Optional)</Label>
+                      <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. 9876543210" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="address">Address line (Optional)</Label>
+                      <Input id="address" name="address" value={formData.address} onChange={handleChange} placeholder="e.g. Andheri East, Mumbai" />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number (Optional)</Label>
-                    <Input id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="e.g. 9876543210" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address line (Optional)</Label>
-                    <Input id="address" name="address" value={formData.address} onChange={handleChange} placeholder="e.g. Andheri East, Mumbai" />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSaving}>
+                  <Button type="submit" className="w-full shrink-0" disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     {isSaving ? "Saving..." : "Save Settings"}
                   </Button>
@@ -163,7 +165,7 @@ export default function SettingsPage() {
           </Card>
 
           {/* ── Expiry Warning Thresholds ──────────────────────────────────────── */}
-          <Card>
+          <Card className="flex flex-col">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
@@ -177,82 +179,83 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1">
               {isExpiryLoading ? (
                 <div className="flex items-center justify-center p-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <form onSubmit={handleExpirySubmit} className="space-y-6">
+                  <form onSubmit={handleExpirySubmit} className="flex flex-col h-full space-y-6">
+                    <div className="flex-1 space-y-6">
+                      {/* Early Warning */}
+                      <div className="space-y-2">
+                        <Label htmlFor="earlyWarningDays" className="flex items-center gap-2">
+                          <span className="text-base">🟡</span> Early Warning (days)
+                        </Label>
+                        <Input
+                          id="earlyWarningDays"
+                          name="earlyWarningDays"
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={expiryForm.earlyWarningDays}
+                          onChange={handleExpiryChange}
+                          className={expiryErrors.earlyWarningDays ? "border-destructive" : ""}
+                        />
+                        {expiryErrors.earlyWarningDays && (
+                          <p className="text-xs text-destructive">{expiryErrors.earlyWarningDays}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Yellow badge — first notice that expiry is approaching.</p>
+                      </div>
 
-                  {/* Early Warning */}
-                  <div className="space-y-2">
-                    <Label htmlFor="earlyWarningDays" className="flex items-center gap-2">
-                      <span className="text-base">🟡</span> Early Warning (days)
-                    </Label>
-                    <Input
-                      id="earlyWarningDays"
-                      name="earlyWarningDays"
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={expiryForm.earlyWarningDays}
-                      onChange={handleExpiryChange}
-                      className={expiryErrors.earlyWarningDays ? "border-destructive" : ""}
-                    />
-                    {expiryErrors.earlyWarningDays && (
-                      <p className="text-xs text-destructive">{expiryErrors.earlyWarningDays}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Yellow badge — first notice that expiry is approaching.</p>
-                  </div>
+                      {/* Urgent Warning */}
+                      <div className="space-y-2">
+                        <Label htmlFor="urgentWarningDays" className="flex items-center gap-2">
+                          <span className="text-base">🟠</span> Urgent Warning (days)
+                        </Label>
+                        <Input
+                          id="urgentWarningDays"
+                          name="urgentWarningDays"
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={expiryForm.urgentWarningDays}
+                          onChange={handleExpiryChange}
+                          className={expiryErrors.urgentWarningDays ? "border-destructive" : ""}
+                        />
+                        {expiryErrors.urgentWarningDays && (
+                          <p className="text-xs text-destructive">{expiryErrors.urgentWarningDays}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Orange badge — action should be taken soon.</p>
+                      </div>
 
-                  {/* Urgent Warning */}
-                  <div className="space-y-2">
-                    <Label htmlFor="urgentWarningDays" className="flex items-center gap-2">
-                      <span className="text-base">🟠</span> Urgent Warning (days)
-                    </Label>
-                    <Input
-                      id="urgentWarningDays"
-                      name="urgentWarningDays"
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={expiryForm.urgentWarningDays}
-                      onChange={handleExpiryChange}
-                      className={expiryErrors.urgentWarningDays ? "border-destructive" : ""}
-                    />
-                    {expiryErrors.urgentWarningDays && (
-                      <p className="text-xs text-destructive">{expiryErrors.urgentWarningDays}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Orange badge — action should be taken soon.</p>
-                  </div>
+                      {/* Critical */}
+                      <div className="space-y-2">
+                        <Label htmlFor="criticalDays" className="flex items-center gap-2">
+                          <span className="text-base">🔴</span> Critical (days)
+                        </Label>
+                        <Input
+                          id="criticalDays"
+                          name="criticalDays"
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={expiryForm.criticalDays}
+                          onChange={handleExpiryChange}
+                          className={expiryErrors.criticalDays ? "border-destructive" : ""}
+                        />
+                        {expiryErrors.criticalDays && (
+                          <p className="text-xs text-destructive">{expiryErrors.criticalDays}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Red badge + billing confirmation dialog triggered.</p>
+                      </div>
+                    </div>
 
-                  {/* Critical */}
-                  <div className="space-y-2">
-                    <Label htmlFor="criticalDays" className="flex items-center gap-2">
-                      <span className="text-base">🔴</span> Critical (days)
-                    </Label>
-                    <Input
-                      id="criticalDays"
-                      name="criticalDays"
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={expiryForm.criticalDays}
-                      onChange={handleExpiryChange}
-                      className={expiryErrors.criticalDays ? "border-destructive" : ""}
-                    />
-                    {expiryErrors.criticalDays && (
-                      <p className="text-xs text-destructive">{expiryErrors.criticalDays}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Red badge + billing confirmation dialog triggered.</p>
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isExpirySaving}>
-                    {isExpirySaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    {isExpirySaving ? "Saving..." : "Save Thresholds"}
-                  </Button>
-                </form>
+                    <Button type="submit" className="w-full shrink-0" disabled={isExpirySaving}>
+                      {isExpirySaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {isExpirySaving ? "Saving..." : "Save Thresholds"}
+                    </Button>
+                  </form>
               )}
             </CardContent>
           </Card>

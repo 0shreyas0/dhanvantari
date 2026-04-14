@@ -34,6 +34,25 @@ export default async function FinancePage() {
     },
   });
 
+  // Fetch all batches to calculate internal loss (Expired/Recalled)
+  const allBatches = await prisma.batch.findMany({
+    where: {
+      medicine: { userId }
+    }
+  });
+
+  const now = new Date();
+  
+  // 1. Calculate Expired Loss
+  const expiredBatches = allBatches.filter(b => b.expiryDate < now && b.quantity > 0 && !b.isRecalled);
+  const expiredLoss = expiredBatches.reduce((sum, b) => sum + (b.quantity * b.costPrice), 0);
+
+  // 2. Calculate Recalled Loss (Recalled takes priority over Expired for tracking)
+  const recalledBatches = allBatches.filter(b => b.isRecalled && b.quantity > 0);
+  const recalledLoss = recalledBatches.reduce((sum, b) => sum + (b.quantity * b.costPrice), 0);
+
+  const totalLoss = expiredLoss + recalledLoss;
+
   const bills = billsRaw.map(bill => ({
     id: bill.id,
     customerName: bill.customerName,
@@ -64,18 +83,30 @@ export default async function FinancePage() {
         </div>
 
         {/* Top Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div className="p-6 bg-card border border-border rounded-xl shadow-sm">
                 <h3 className="text-sm font-medium text-muted-foreground mb-1">Lifetime Revenue</h3>
-                <p className="text-3xl font-bold">₹{totalRevenue.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-primary">₹{totalRevenue.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Total across {bills.length} sales</p>
             </div>
             <div className="p-6 bg-card border border-border rounded-xl shadow-sm">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Total Transactions</h3>
-                <p className="text-3xl font-bold">{bills.length}</p>
-            </div>
-            <div className="p-6 bg-card border border-border rounded-xl shadow-sm">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Average Order Value</h3>
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">Average Order</h3>
                 <p className="text-3xl font-bold">₹{averageOrderValue.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Per transaction average</p>
+            </div>
+            <div className="p-6 bg-card border border-border rounded-xl shadow-sm border-l-orange-500/50">
+                <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Expired Loss
+                </h3>
+                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">₹{expiredLoss.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{expiredBatches.length} dead batches</p>
+            </div>
+            <div className="p-6 bg-card border border-border rounded-xl shadow-sm border-l-red-500/50">
+                <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
+                    Recalled Loss
+                </h3>
+                <p className="text-3xl font-bold text-red-600 dark:text-red-400">₹{recalledLoss.toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Frozen capital</p>
             </div>
         </div>
 

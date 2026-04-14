@@ -31,44 +31,67 @@ export default async function ProductsPage() {
     : DEFAULT_EXPIRY_SETTINGS;
 
   const data = medicines.map(med => {
-    const activeBatches = med.batches.filter(b => !b.isRecalled);
-    const recalledBatches = med.batches.filter(b => b.isRecalled);
-    
-    const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0);
-    const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0;
-    const hasRecall = recalledBatches.length > 0;
-    const batches = med.batches.map(b => b.batchNumber).join(", ");
+    const recalledBatches = med.batches.filter(b => b.isRecalled)
+    const recalledCount = recalledBatches.length
+    const allRecalled = med.batches.length > 0 && recalledCount === med.batches.length
 
-    // Earliest expiry across all IN-STOCK, non-recalled batches (FEFO)
-    const available = med.batches.filter(b => b.quantity > 0 && !b.isRecalled)
-    available.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
-    const expiryDate = available.length > 0
-      ? available[0].expiryDate.toISOString()
-      : med.batches.length > 0
-        ? med.batches.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())[0].expiryDate.toISOString()
+    // Active = not recalled
+    const activeBatches = med.batches.filter(b => !b.isRecalled)
+    const activeStock = activeBatches.reduce((sum, b) => sum + b.quantity, 0)
+    const totalStock = med.batches.reduce((sum, b) => sum + b.quantity, 0)
+
+    // Nearest expiry = earliest across ALL batches with stock > 0 (including recalled)
+    const batchesWithStock = [...med.batches]
+      .filter(b => b.quantity > 0)
+      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+
+    const expiryDate =
+      batchesWithStock.length > 0
+        ? batchesWithStock[0].expiryDate.toISOString()
+        : med.batches.length > 0
+        ? [...med.batches].sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())[0].expiryDate.toISOString()
         : null
 
-    let status = "In Stock";
-    if (hasRecall) {
-        status = "Recalled";
-    } else if (stock === 0) {
-        status = "Out of Stock";
-    } else if (stock < med.lowStockThreshold) {
-        status = "Low Stock";
-    }
-    
+    // Price from FEFO of active (non-recalled) batches with stock
+    const activeSorted = activeBatches
+      .filter(b => b.quantity > 0)
+      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+    const fefoPrice =
+      activeSorted.length > 0
+        ? activeSorted[0].sellingPrice
+        : med.batches.length > 0
+        ? med.batches[0].sellingPrice
+        : 0
+
+    // Status: only "Recalled" if EVERY batch is recalled.
+    // Otherwise derive from active (non-recalled) stock.
+    let status = "In Stock"
+    if (allRecalled) status = "Recalled"
+    else if (activeStock === 0) status = "Out of Stock"
+    else if (activeStock < med.lowStockThreshold) status = "Low Stock"
+
     return {
       id: med.id,
       name: med.name,
-      barcode: med.barcode,
-      batch: batches || "N/A",
-      stock,
-      price,
+      category: med.category ?? null,
+      description: med.description ?? null,
+      totalStock,
+      price: fefoPrice,
       status,
+      recalledCount,   // > 0 means partial recall — table shows warning chip
       expiryDate,
-      rawBatches: med.batches,
-    };
-  });
+      batches: med.batches.map(b => ({
+        id: b.id,
+        barcode: b.barcode,
+        batchNumber: b.batchNumber,
+        quantity: b.quantity,
+        costPrice: b.costPrice,
+        sellingPrice: b.sellingPrice,
+        expiryDate: b.expiryDate.toISOString(),
+        isRecalled: b.isRecalled,
+      })),
+    }
+  })
 
   return (
     <PageContainer>

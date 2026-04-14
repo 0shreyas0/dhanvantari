@@ -14,7 +14,6 @@ model Medicine {
   id          String  @id @default(uuid())
   userId      String // Maps to Clerk User ID
   name        String
-  barcode     String // The globally unique barcode for this medicine type
   description String?
   category    String? // e.g. "Antibiotics", "Painkillers"
 
@@ -28,8 +27,6 @@ model Medicine {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   billItems BillItem[]
-
-  @@unique([barcode, userId])
 }
 
 // 2. Batches: Specific stock entries (Expiry tracking happens here!)
@@ -38,6 +35,7 @@ model Batch {
   medicineId String
   medicine   Medicine @relation(fields: [medicineId], references: [id])
 
+  barcode     String // The barcode for THIS batch (Batch specific identification)
   batchNumber String // Printed on the box
   quantity    Int // Current stock for THIS batch
 

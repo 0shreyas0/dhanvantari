@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { auth } from "@clerk/nextjs/server"
 import Fuse from "fuse.js"
+import { generateEAN13 } from "@/lib/barcode"
 
 export async function searchProducts(query: string) {
   if (!query) return []
@@ -24,6 +25,9 @@ export async function searchProducts(query: string) {
     const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0)
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     
+    // Concatenate all batch barcodes for searching
+    const barcodes = med.batches.map(b => b.barcode).join(" ")
+
     const availableBatches = med.batches.filter(b => b.quantity > 0)
     availableBatches.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
     
@@ -56,7 +60,7 @@ export async function searchProducts(query: string) {
     return {
       id: med.id,
       name: med.name,
-      barcode: med.barcode,
+      barcodes, // Combined barcodes from all batches
       stock,
       price,
       isExpired,
@@ -70,7 +74,7 @@ export async function searchProducts(query: string) {
   const fuse = new Fuse(formattedMedicines, {
     keys: [
         { name: 'name', weight: 0.7 }, // Prioritize matching the name
-        { name: 'barcode', weight: 0.3 } // Still allow barcode searches
+        { name: 'barcodes', weight: 0.3 } // Still allow barcode searches
     ],
     threshold: 0.4, // Allows for a moderate level of typos (0.0 is perfect match, 1.0 is everything matches)
     includeScore: true,
@@ -86,12 +90,15 @@ export async function getMedicineByBarcode(barcode: string) {
   const { userId } = await auth()
   if (!userId) return null
 
-  return await prisma.medicine.findFirst({
+  const batch = await prisma.batch.findFirst({
     where: {
-      userId,
-      barcode
-    }
+      barcode,
+      medicine: { userId }
+    },
+    include: { medicine: true }
   })
+
+  return batch?.medicine || null
 }
 
 export async function processBill(
@@ -199,15 +206,14 @@ export async function createMedicine(data: {
 
   const result = await prisma.$transaction(async (tx) => {
     let medicine = await tx.medicine.findFirst({
-      where: { userId, barcode }
+      where: { userId, name } // Searching by name as fallback unique key for medicine type
     })
 
     if (medicine) {
-      // Update existing medicine details if they changed them
+      // Update existing medicine details
       medicine = await tx.medicine.update({
         where: { id: medicine.id },
         data: {
-          name,
           category,
           description,
           lowStockThreshold,
@@ -218,7 +224,6 @@ export async function createMedicine(data: {
         data: {
           userId,
           name,
-          barcode: barcode,
           category,
           description,
           lowStockThreshold,
@@ -229,6 +234,7 @@ export async function createMedicine(data: {
     await tx.batch.create({
       data: {
         medicineId: medicine.id,
+        barcode: barcode, // Barcode goes to batch
         batchNumber: initialBatch.batchNumber,
         quantity: initialBatch.quantity,
         costPrice: initialBatch.costPrice,
@@ -246,6 +252,109 @@ export async function createMedicine(data: {
   })
 
   return { success: true, medicine: result }
+}
+
+// ─── Create medicine (no batch required) ──────────────────────────────────────
+
+export async function createMedicineOnly(data: {
+  name: string
+  category?: string
+  description?: string
+  lowStockThreshold: number
+}) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const medicine = await prisma.medicine.create({
+    data: {
+      userId,
+      name: data.name,
+      category: data.category,
+      description: data.description,
+      lowStockThreshold: data.lowStockThreshold,
+    },
+  })
+
+  return { success: true, medicine }
+}
+
+// ─── Add a batch to an existing medicine ──────────────────────────────────────
+
+export async function addBatchToMedicine(
+  medicineId: string,
+  data: {
+    barcode?: string       // scan: associates the real manufacturer barcode with the medicine
+    batchNumber: string
+    quantity: number
+    costPrice: number
+    sellingPrice: number
+    expiryDate: Date
+  }
+) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  return await prisma.$transaction(async (tx) => {
+    // Verify ownership
+    const medicine = await tx.medicine.findFirst({
+      where: { id: medicineId, userId },
+    })
+    if (!medicine) throw new Error("Medicine not found or unauthorized")
+
+    // Create the batch + generate serial numbers
+    const batch = await tx.batch.create({
+      data: {
+        medicineId,
+        barcode: data.barcode || generateEAN13(), // Every batch gets a barcode (internal if not provided)
+        batchNumber: data.batchNumber,
+        quantity: data.quantity,
+        costPrice: data.costPrice,
+        sellingPrice: data.sellingPrice,
+        expiryDate: data.expiryDate,
+        serialNumbers: {
+          create: Array.from({ length: data.quantity }).map(() => ({
+            code: crypto.randomUUID(),
+          })),
+        },
+      },
+    })
+
+    return { success: true, batch }
+  })
+}
+
+// ─── Auto-generate next batch details ─────────────────────────────────────────
+
+export async function getAutoBatchDetails(medicineId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  // Find the latest batch for this medicine to determine the next serial number
+  const lastBatch = await prisma.batch.findFirst({
+    where: { 
+      medicineId,
+      medicine: { userId }
+    },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  let nextBatchNumber = "BAT-001"
+  if (lastBatch && lastBatch.batchNumber) {
+    // Try to parse BAT-XXX and increment
+    const match = lastBatch.batchNumber.match(/^BAT-(\d+)$/)
+    if (match) {
+      const currentNum = parseInt(match[1])
+      nextBatchNumber = `BAT-${(currentNum + 1).toString().padStart(3, '0')}`
+    } else {
+      // Fallback: timestamp based if last batch didn't follow the pattern
+      nextBatchNumber = `BN-${new Date().getFullYear()}-${Math.floor(Math.random() * 900) + 100}`
+    }
+  }
+
+  return {
+    batchNumber: nextBatchNumber,
+    barcode: generateEAN13()
+  }
 }
 
 export async function toggleRecallBatch(batchId: string) {
@@ -268,6 +377,35 @@ export async function toggleRecallBatch(batchId: string) {
   })
 
   return { success: true, isRecalled: updatedBatch.isRecalled }
+}
+
+// ─── Delete a medicine and all its associated data ─────────────────────────────
+
+export async function deleteMedicine(medicineId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  // Verify ownership first
+  const medicine = await prisma.medicine.findFirst({
+    where: { id: medicineId, userId },
+  })
+  if (!medicine) throw new Error("Medicine not found or unauthorized")
+
+  // Cascade delete in dependency order
+  await prisma.$transaction(async (tx) => {
+    // 1. Serial numbers (belong to batches of this medicine)
+    await tx.serialNumber.deleteMany({
+      where: { batch: { medicineId } },
+    })
+    // 2. Batches
+    await tx.batch.deleteMany({ where: { medicineId } })
+    // 3. Bill line items referencing this medicine (historical — warn user in UI)
+    await tx.billItem.deleteMany({ where: { medicineId } })
+    // 4. Finally the medicine itself
+    await tx.medicine.delete({ where: { id: medicineId } })
+  })
+
+  return { success: true }
 }
 
 export async function getBillDetails(billId: string) {
@@ -361,7 +499,7 @@ export async function exportInventoryToCSV() {
       if (med.batches.length === 0) {
           return [{
               "Medicine Name": med.name,
-              "Barcode": med.barcode,
+              "Barcode": "N/A",
               "Category": med.category || "",
               "Batch No.": "N/A",
               "Stock": 0,
@@ -375,7 +513,7 @@ export async function exportInventoryToCSV() {
           const isExpired = new Date(batch.expiryDate) < new Date()
           return {
               "Medicine Name": med.name,
-              "Barcode": med.barcode,
+              "Barcode": batch.barcode,
               "Category": med.category || "",
               "Batch No.": batch.batchNumber,
               "Stock": batch.quantity,
@@ -409,16 +547,15 @@ export async function importInventoryFromCSV(rows: any[]) {
 
       // Use a transaction for each row to ensure medicine and batch are synced
       await prisma.$transaction(async (tx) => {
-          // 1. Find or create medicine
-          let medicine = await tx.medicine.findUnique({
-              where: { barcode_userId: { barcode, userId } }
+          // 1. Find or create medicine by name (since barcode is per batch now)
+          let medicine = await tx.medicine.findFirst({
+              where: { name, userId }
           })
 
           if (!medicine) {
               medicine = await tx.medicine.create({
                   data: {
                       name,
-                      barcode,
                       userId,
                       category: row["Category"] || ""
                   }
@@ -429,6 +566,7 @@ export async function importInventoryFromCSV(rows: any[]) {
           await tx.batch.create({
               data: {
                   medicineId: medicine.id,
+                  barcode,
                   batchNumber,
                   quantity,
                   sellingPrice: price,
