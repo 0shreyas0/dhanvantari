@@ -159,11 +159,7 @@ export default function BillingPage() {
         const details = await getBillDetails(result.billId)
         setLastBill(details)
         setShowSuccessDialog(true)
-        
         setBillItems([])
-        setCustomerName("")
-        setCustomerPhone("")
-        setCustomerEmail("")
         toast.success("Bill processed successfully")
       } else {
         toast.error(result.error || "Failed to process bill.")
@@ -596,7 +592,14 @@ export default function BillingPage() {
               <Button 
                 variant="default" 
                 className="flex-1"
-                onClick={() => setShowSuccessDialog(false)}
+                onClick={() => {
+                  setShowSuccessDialog(false)
+                  setTimeout(() => {
+                    setCustomerName("")
+                    setCustomerPhone("")
+                    setCustomerEmail("")
+                  }, 300) // Delay reset slightly until dialog transition finishes
+                }}
               >
                 Done
               </Button>

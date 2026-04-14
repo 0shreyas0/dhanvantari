@@ -1,6 +1,7 @@
 "use server"
 
 import twilio from "twilio"
+import { getSignedPdfUrl } from "@/lib/pdf-token"
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID
 const authToken = process.env.TWILIO_AUTH_TOKEN
@@ -26,6 +27,8 @@ export async function sendWhatsAppReceipt(
       `• ${item.name} x ${item.quantity} = ₹${(item.price * item.quantity).toFixed(2)}`
     ).join('\n');
 
+    const pdfUrl = getSignedPdfUrl(billId);
+
     const messageBody = `*${pharmacyName.toUpperCase()} - DIGI RECEIPT*\n` +
       `--------------------------\n` +
       `*Customer:* ${customerName || 'Valued Customer'}\n` +
@@ -33,6 +36,7 @@ export async function sendWhatsAppReceipt(
       `*Date:* ${new Date().toLocaleDateString()}\n\n` +
       `*Items Dispensed:*\n${itemsList}\n\n` +
       `*Total Amount: ₹${total.toFixed(2)}*\n\n` +
+      `📄 *Download PDF Receipt:*\n${pdfUrl}\n\n` +
       `_Digitized by Dhanvantari ✨_`;
 
     // Ensure number is in E.164 format and prefixed with whatsapp:
