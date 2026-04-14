@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, FileText, Smartphone } from "lucide-react"
 import Link from "next/link"
 
-export default async function PublicBillPage({ params }: { params: { id: string } }) {
-  const bill = await getBillDetails(params.id)
-  const pdfUrl = bill ? getSignedPdfUrl(params.id) : null
+export default async function PublicBillPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const bill = await getBillDetails(id)
+  const pdfUrl = bill ? getSignedPdfUrl(id) : null
 
   if (!bill) {
     return (

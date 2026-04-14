@@ -27,9 +27,9 @@ function verifyToken(billId: string, token: string): boolean {
 // -------------------------------------------------------------------
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params
+  const { id } = await params
   const token = request.nextUrl.searchParams.get("token")
 
   // 1. Security check
