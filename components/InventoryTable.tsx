@@ -176,7 +176,7 @@ export default function InventoryTable({
     router.refresh()
   }
 
-  const handleExport = async () => {
+  const handleExport = async (mode: 'download' | 'copy' = 'download') => {
     setIsExporting(true)
     try {
       const rows = await exportInventoryToCSV()
@@ -188,15 +188,22 @@ export default function InventoryTable({
           headers.map(h => JSON.stringify((row as any)[h] || "")).join(",")
         ),
       ].join("\n")
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `Dhanvantari_Inventory_${new Date().toLocaleDateString()}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      toast.success("Inventory exported successfully!")
+
+      if (mode === 'download') {
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `Dhanvantari_Inventory_${new Date().toLocaleDateString()}.csv`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        toast.success("Inventory exported successfully!")
+      } else {
+        // Copy to clipboard
+        await navigator.clipboard.writeText(csv)
+        toast.success("Inventory CSV copied to clipboard!")
+      }
     } catch {
       toast.error("Failed to export inventory")
     } finally {
@@ -269,16 +276,13 @@ export default function InventoryTable({
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Export Options</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExport} className="gap-2">
+                  <DropdownMenuItem onClick={() => handleExport('download')} className="gap-2">
                     <TableIcon className="h-4 w-4 text-muted-foreground" />
                     Download as .CSV
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    handleExport()
-                    setTimeout(() => window.open("https://sheets.new", "_blank"), 1000)
-                  }} className="gap-2">
+                  <DropdownMenuItem onClick={() => handleExport('copy')} className="gap-2">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    Export to Google Sheets
+                    Copy to Clipboard (CSV)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -338,8 +342,9 @@ export default function InventoryTable({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead className="w-12 text-center text-[10px] font-bold px-0">#</TableHead>
-              <TableHead className="w-[150px]">Medicine Name</TableHead>
-              <TableHead className="w-[220px]">Batches / Barcode</TableHead>
+              <TableHead className="w-[180px]">Medicine Name</TableHead>
+              <TableHead className="w-[120px]">Category</TableHead>
+              <TableHead className="w-[200px]">Batches / Barcode</TableHead>
               <TableHead className="w-[90px]">Stock</TableHead>
               <TableHead className="w-[110px]">Price (FEFO)</TableHead>
               <TableHead className="w-[160px]">Nearest Expiry</TableHead>
@@ -371,11 +376,6 @@ export default function InventoryTable({
                           <span className={med.description ? "cursor-default underline decoration-dotted decoration-muted-foreground/40 underline-offset-2" : ""}>
                             {med.name}
                           </span>
-                          {med.category && (
-                            <span className="text-[11px] font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded w-fit">
-                              {med.category}
-                            </span>
-                          )}
                           {med.description && (
                             <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-50 max-w-[240px] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                               {med.description}
@@ -383,6 +383,13 @@ export default function InventoryTable({
                             </div>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {med.category && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border border-border/50">
+                            {med.category}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -440,6 +447,7 @@ export default function InventoryTable({
                           <TableCell className="text-xs font-mono font-bold text-foreground">
                              {batch.batchNumber}
                           </TableCell>
+                          <TableCell />
                           <TableCell className="font-mono text-xs">
                              <div className="flex items-center gap-2">
                                 <span className="text-foreground">{batch.barcode}</span>
@@ -460,8 +468,21 @@ export default function InventoryTable({
                             <ExpiryBadge expiryDate={batch.expiryDate} settings={expirySettings} />
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               <StatusBadge status={batchStatus} />
+                              <AddBatchDialog
+                                medicineId={med.id}
+                                medicineName={med.name}
+                                editBatchId={batch.id}
+                                initialData={{
+                                  barcode: batch.barcode,
+                                  batchNumber: batch.batchNumber,
+                                  quantity: batch.quantity,
+                                  costPrice: batch.costPrice,
+                                  sellingPrice: batch.sellingPrice,
+                                  expiryDate: new Date(batch.expiryDate).toISOString().split('T')[0]
+                                }}
+                              />
                               <button
                                 onClick={() => handleToggleRecall(batch.id)}
                                 className={`p-1 rounded hover:bg-muted ${batch.isRecalled ? "text-red-500" : "text-muted-foreground/40 hover:text-muted-foreground"}`}

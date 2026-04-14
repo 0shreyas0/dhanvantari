@@ -541,18 +541,25 @@ export async function importInventoryFromCSV(rows: any[]) {
   for (const row of rows) {
     try {
       const name = row["Medicine Name"]
-      const barcode = row["Barcode"]
-      const batchNumber = row["Batch No."] || "B-001"
+      if (!name) continue
+
+      // STRICT SYSTEM GENERATION (Ignore CSV columns for these)
+      const barcode = Date.now().toString() + Math.floor(Math.random() * 1000).toString()
+      const batchNumber = "BAT-" + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+
+      // Capture available data, default to 0/placeholder if not present
       const quantity = parseInt(row["Stock"]) || 0
       const sellingPrice = parseFloat(row["Selling Price"]) || 0
       const costPrice = row["Cost Price"] ? parseFloat(row["Cost Price"]) : sellingPrice * 0.8
-      const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : new Date(Date.now() + 365*24*60*60*1000)
-
-      if (!name || !barcode) continue
+      
+      // Default to 1 year from now if expiry isn't found
+      const defaultExpiry = new Date()
+      defaultExpiry.setFullYear(defaultExpiry.getFullYear() + 1)
+      const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : defaultExpiry
 
       // Use a transaction for each row to ensure medicine and batch are synced
       await prisma.$transaction(async (tx) => {
-          // 1. Find or create medicine by name (since barcode is per batch now)
+          // 1. Find or create medicine by name
           let medicine = await tx.medicine.findFirst({
               where: { name, userId }
           })
@@ -568,15 +575,15 @@ export async function importInventoryFromCSV(rows: any[]) {
               })
           }
 
-          // 2. Add batch
+          // 2. Add batch with strictly generated metadata
           await tx.batch.create({
               data: {
                   medicineId: medicine.id,
                   barcode,
                   batchNumber,
                   quantity,
-                  sellingPrice: sellingPrice,
-                  costPrice: costPrice,
+                  sellingPrice,
+                  costPrice,
                   expiryDate: expiry
               }
           })
@@ -589,4 +596,23 @@ export async function importInventoryFromCSV(rows: any[]) {
   }
 
   return { success: true, successCount, errorCount }
+}
+
+export async function updateBatch(batchId: string, data: {
+  barcode?: string
+  batchNumber?: string
+  quantity?: number
+  costPrice?: number
+  sellingPrice?: number
+  expiryDate?: Date
+}) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const batch = await prisma.batch.update({
+    where: { id: batchId },
+    data
+  })
+
+  return batch
 }
