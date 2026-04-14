@@ -302,17 +302,48 @@ export default function InventoryTable({
   return (
     <Card className="border-border/40 shadow-sm">
       {/* ── Header ── */}
-      <CardHeader className="border-b border-border/40 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-medium">Inventory List</CardTitle>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1">
+      <CardHeader className="border-b border-border/40 px-4 sm:px-6 py-5">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-xl font-bold tracking-tight">Inventory List</CardTitle>
+            <p className="text-xs text-muted-foreground sm:hidden">Manage and track your products.</p>
+          </div>
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center w-full lg:w-auto">
+            {/* Search and Status - Main Focus on Mobile */}
+            <div className="flex flex-col gap-3 min-[450px]:flex-row flex-1">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-10 h-11 sm:h-10 w-full bg-muted/30"
+                    />
+                </div>
+                <select
+                    value={statusFilter}
+                    onChange={e => setStatusFilter(e.target.value)}
+                    className="h-11 sm:h-10 w-full min-[450px]:w-[140px] rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                >
+                    <option value="all">All Status</option>
+                    <option value="In Stock">In Stock</option>
+                    <option value="Low Stock">Low Stock</option>
+                    <option value="Out of Stock">Out of Stock</option>
+                    <option value="Recalled">Recalled</option>
+                </select>
+            </div>
+
+            <div className="hidden sm:block h-6 w-px bg-border mx-1" />
+
+            {/* Actions Area - Grid on small mobile, Row on larger */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-1.5">
               {/* Export Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 gap-2" disabled={isExporting}>
+                  <Button variant="outline" size="sm" className="h-11 sm:h-9 gap-2 w-full sm:w-auto" disabled={isExporting}>
                     {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    Export
+                    <span>Export</span>
                     <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -333,9 +364,9 @@ export default function InventoryTable({
               {/* Import Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 gap-2" disabled={isImporting}>
+                  <Button variant="outline" size="sm" className="h-11 sm:h-9 gap-2 w-full sm:w-auto" disabled={isImporting}>
                     {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-                    Import
+                    <span>Import</span>
                     <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -354,47 +385,27 @@ export default function InventoryTable({
               </DropdownMenu>
               <input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={handleImport} />
             </div>
-            <div className="h-6 w-px bg-border mx-1" />
-            <div className="relative w-64">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products/barcodes..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-8 h-9"
-              />
-            </div>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value)}
-              className="h-9 w-[150px] rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              <option value="all">All Status</option>
-              <option value="In Stock">In Stock</option>
-              <option value="Low Stock">Low Stock</option>
-              <option value="Out of Stock">Out of Stock</option>
-              <option value="Recalled">Recalled</option>
-            </select>
           </div>
         </div>
       </CardHeader>
 
       {/* ── Table ── */}
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-12 text-center text-[10px] font-bold px-0">#</TableHead>
-              <TableHead className="w-[180px]">Medicine Name</TableHead>
-              <TableHead className="w-[120px]">Category</TableHead>
-              <TableHead className="w-[200px]">Batches / Barcode</TableHead>
-              <TableHead className="w-[90px]">Stock</TableHead>
-              <TableHead className="w-[110px]">Price (FEFO)</TableHead>
-              <TableHead className="w-[160px]">Nearest Expiry</TableHead>
-              <TableHead className="w-[140px]">Status</TableHead>
-              <TableHead className="w-[80px]" />
-            </TableRow>
-          </TableHeader>
+        <div className="overflow-x-auto">
+          <Table className="min-w-[800px] md:min-w-full">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-12 text-center text-[10px] font-bold px-0">#</TableHead>
+                <TableHead className="w-[180px]">Medicine Name</TableHead>
+                <TableHead className="w-[120px] hidden sm:table-cell">Category</TableHead>
+                <TableHead className="w-[160px] hidden md:table-cell">Batches / Barcode</TableHead>
+                <TableHead className="w-[80px]">Stock</TableHead>
+                <TableHead className="w-[100px]">Price (FEFO)</TableHead>
+                <TableHead className="w-[150px] hidden min-[450px]:table-cell">Nearest Expiry</TableHead>
+                <TableHead className="w-[130px]">Status</TableHead>
+                <TableHead className="w-[80px]" />
+              </TableRow>
+            </TableHeader>
           <TableBody>
             {filteredData.length > 0 ? (
               filteredData.map(med => {
@@ -415,34 +426,31 @@ export default function InventoryTable({
                         </button>
                       </TableCell>
                       <TableCell className="font-medium">
-                        <div className="relative group inline-flex flex-col gap-0.5">
-                          <span className={med.description ? "cursor-default underline decoration-dotted decoration-muted-foreground/40 underline-offset-2" : ""}>
+                        <div className="relative group inline-flex flex-col gap-0.5 max-w-[120px] sm:max-w-none">
+                          <span className={`truncate sm:whitespace-normal underline decoration-dotted decoration-muted-foreground/40 underline-offset-2`}>
                             {med.name}
                           </span>
-                          {med.description && (
-                            <div className="pointer-events-none absolute bottom-full left-0 mb-2 z-50 max-w-[240px] rounded-md border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                              {med.description}
-                              <span className="absolute top-full left-4 border-4 border-transparent border-t-border" />
-                            </div>
-                          )}
+                          <span className="text-[10px] text-muted-foreground sm:hidden truncate opacity-70">
+                            {med.category || "General"}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {med.category && (
                           <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full border border-border/50">
                             {med.category}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
                           <Layers className="h-3.5 w-3.5" />
                           <span className="text-sm">{med.batches.length} batch{med.batches.length !== 1 ? "es" : ""}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-medium text-lg leading-none">{med.totalStock}</TableCell>
-                      <TableCell className="font-medium">₹{med.price.toFixed(2)}</TableCell>
-                      <TableCell>
+                      <TableCell className="font-medium text-base sm:text-lg leading-none">{med.totalStock}</TableCell>
+                      <TableCell className="font-medium text-sm sm:text-base">₹{med.price.toFixed(2)}</TableCell>
+                      <TableCell className="hidden min-[450px]:table-cell">
                         {med.expiryDate
                           ? <ExpiryBadge expiryDate={med.expiryDate} settings={expirySettings} />
                           : <span className="text-xs text-muted-foreground">—</span>
@@ -551,6 +559,7 @@ export default function InventoryTable({
             )}
           </TableBody>
         </Table>
+        </div>
       </CardContent>
 
       <Dialog open={isGSheetModalOpen} onOpenChange={setIsGSheetModalOpen}>

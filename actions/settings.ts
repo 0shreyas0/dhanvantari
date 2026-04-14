@@ -1,51 +1,23 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
 import { auth } from "@clerk/nextjs/server"
+import {
+  getOrCreateExpirySettings,
+  getOrCreatePharmacySettings,
+  updateExpirySettingsForUser,
+  updatePharmacySettingsForUser,
+} from "@/lib/server/settings-service"
 
 export async function getPharmacySettings() {
   const { userId } = await auth()
   if (!userId) return null
-
-  let settings = await prisma.pharmacySettings.findUnique({
-    where: { userId }
-  })
-
-  // Create default if not exists
-  if (!settings) {
-    settings = await prisma.pharmacySettings.create({
-      data: {
-        userId,
-        name: "My Pharmacy",
-        phone: "",
-        address: ""
-      }
-    })
-  }
-
-  return settings
+  return getOrCreatePharmacySettings(userId)
 }
 
 export async function updatePharmacySettings(data: { name: string; phone?: string; address?: string; logoUrl?: string }) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
-
-  const settings = await prisma.pharmacySettings.upsert({
-    where: { userId },
-    update: {
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      logoUrl: data.logoUrl
-    },
-    create: {
-      userId,
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      logoUrl: data.logoUrl
-    }
-  })
+  const settings = await updatePharmacySettingsForUser(userId, data)
 
   return { success: true, settings }
 }
@@ -55,16 +27,7 @@ export async function updatePharmacySettings(data: { name: string; phone?: strin
 export async function getExpirySettings() {
   const { userId } = await auth()
   if (!userId) return null
-
-  let settings = await prisma.expirySettings.findUnique({ where: { userId } })
-
-  if (!settings) {
-    settings = await prisma.expirySettings.create({
-      data: { userId, earlyWarningDays: 90, urgentWarningDays: 30, criticalDays: 7 },
-    })
-  }
-
-  return settings
+  return getOrCreateExpirySettings(userId)
 }
 
 export async function updateExpirySettings(data: {
@@ -74,18 +37,7 @@ export async function updateExpirySettings(data: {
 }) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
-
-  // Validate ordering
-  if (!(data.criticalDays < data.urgentWarningDays && data.urgentWarningDays < data.earlyWarningDays)) {
-    throw new Error("criticalDays < urgentWarningDays < earlyWarningDays must hold")
-  }
-
-  const settings = await prisma.expirySettings.upsert({
-    where: { userId },
-    update: data,
-    create: { userId, ...data },
-  })
+  const settings = await updateExpirySettingsForUser(userId, data)
 
   return { success: true, settings }
 }
-

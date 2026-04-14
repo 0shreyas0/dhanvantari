@@ -85,30 +85,26 @@ export default async function FinancePage() {
         </div>
 
         {/* Top Metric Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="p-6 bg-card border border-border rounded-xl shadow-sm">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Lifetime Revenue</h3>
-                <p className="text-3xl font-bold text-primary">₹{totalRevenue.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Total across {bills.length} sales</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+            <div className="p-4 sm:p-6 bg-card border border-border rounded-xl shadow-sm">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Lifetime Revenue</h3>
+                <p className="text-2xl sm:text-3xl font-bold text-primary">₹{totalRevenue.toFixed(2)}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Total across {bills.length} sales</p>
             </div>
-            <div className="p-6 bg-card border border-border rounded-xl shadow-sm">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1">Average Order</h3>
-                <p className="text-3xl font-bold">₹{averageOrderValue.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Per transaction average</p>
+            <div className="p-4 sm:p-6 bg-card border border-border rounded-xl shadow-sm">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Average Order</h3>
+                <p className="text-2xl sm:text-3xl font-bold">₹{averageOrderValue.toFixed(2)}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Per transaction average</p>
             </div>
-            <div className="p-6 bg-card border border-border rounded-xl shadow-sm border-l-orange-500/50">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                    Expired Loss
-                </h3>
-                <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">₹{expiredLoss.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">{expiredBatches.length} dead batches</p>
+            <div className="p-4 sm:p-6 bg-card border border-border rounded-xl shadow-sm border-l-4 border-l-orange-500/50">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Expired Loss</h3>
+                <p className="text-2xl sm:text-3xl font-bold text-orange-600 dark:text-orange-400">₹{expiredLoss.toFixed(2)}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{expiredBatches.length} dead batches</p>
             </div>
-            <div className="p-6 bg-card border border-border rounded-xl shadow-sm border-l-red-500/50">
-                <h3 className="text-sm font-medium text-muted-foreground mb-1 flex items-center gap-1.5">
-                    Recalled Loss
-                </h3>
-                <p className="text-3xl font-bold text-red-600 dark:text-red-400">₹{recalledLoss.toFixed(2)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Frozen capital</p>
+            <div className="p-4 sm:p-6 bg-card border border-border rounded-xl shadow-sm border-l-4 border-l-red-500/50">
+                <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Recalled Loss</h3>
+                <p className="text-2xl sm:text-3xl font-bold text-red-600 dark:text-red-400">₹{recalledLoss.toFixed(2)}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">Frozen capital</p>
             </div>
         </div>
 
@@ -122,10 +118,10 @@ export default async function FinancePage() {
                 <Table>
                     <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                            <TableHead className="w-[180px]">Date & Time</TableHead>
+                            <TableHead className="w-[140px] sm:w-[180px]">Date & Time</TableHead>
                             <TableHead>Customer</TableHead>
-                            <TableHead className="max-w-[300px]">Items Purchased</TableHead>
-                            <TableHead className="text-right">Total Amount</TableHead>
+                            <TableHead className="max-w-[300px] hidden md:table-cell">Items Purchased</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
                             <TableHead className="text-right">Bill</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -149,7 +145,7 @@ export default async function FinancePage() {
                                             <span className="text-muted-foreground italic text-sm">Anonymous Walk-in</span>
                                         )}
                                     </TableCell>
-                                    <TableCell className="max-w-[300px]">
+                                    <TableCell className="max-w-[300px] hidden md:table-cell">
                                         <p className="truncate text-sm text-muted-foreground" title={bill.itemsText}>
                                             {bill.itemsText}
                                         </p>

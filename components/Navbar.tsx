@@ -24,10 +24,10 @@ export default function Navbar() {
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b border-border bg-card/80 backdrop-blur-md supports-backdrop-filter:bg-card/60">
-        <div className="relative flex h-16 items-center justify-between px-6">
+        <div className="relative flex h-16 items-center justify-between px-4 sm:px-6">
           {/* Logo Section */}
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 overflow-hidden rounded-xl shadow-sm shadow-primary/20">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative h-9 w-9 sm:h-10 sm:w-10 overflow-hidden rounded-xl shadow-sm shadow-primary/20 shrink-0">
               <Image 
                 src="/logo.png" 
                 alt="Dhanvantari Logo" 
@@ -35,14 +35,14 @@ export default function Navbar() {
                 className="object-cover"
               />
             </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-foreground">Dhanvantari</h1>
-              <p className="text-[10px] uppercase tracking-wider font-medium text-muted-foreground">Inventory System</p>
+            <div className="hidden min-[400px]:block">
+              <h1 className="text-base sm:text-lg font-bold tracking-tight text-foreground leading-tight">Dhanvantari</h1>
+              <p className="text-[9px] sm:text-[10px] uppercase tracking-wider font-medium text-muted-foreground leading-tight">Inventory System</p>
             </div>
           </div>
 
           {/* Navigation Tabs (Centered) */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden lg:block">
             <nav className="flex items-center gap-1">
               {navItems.map((item) => {
                 const isActive = item.href === "/" 
@@ -55,7 +55,7 @@ export default function Navbar() {
                     key={item.href}
                     href={item.href} 
                     data-active={isActive}
-                    className={`relative flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 z-10 ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`relative flex items-center gap-2 px-3 py-2 text-sm font-medium transition-all duration-200 z-10 ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     {isActive && (
                       <motion.div
@@ -64,7 +64,7 @@ export default function Navbar() {
                         transition={{ type: "spring", stiffness: 380, damping: 30 }}
                       />
                     )}
-                    <Icon size={18} />
+                    <Icon size={16} />
                     {item.label}
                   </Link>
                 );
@@ -73,7 +73,7 @@ export default function Navbar() {
           </div>
 
           {/* User Section */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <WipeToggler />
             {/* Mobile Menu Button */}
             <button
@@ -83,13 +83,13 @@ export default function Navbar() {
             >
               {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center shrink-0">
               <UserButton 
-                showName
+                showName={false} // Disable name on mobile header row for space
                 appearance={{
                   elements: {
                     userButtonBox: "flex flex-row-reverse",
-                    userButtonOuterIdentifier: "text-sm font-medium !text-foreground",
+                    userButtonOuterIdentifier: "hidden sm:block text-sm font-medium !text-foreground ml-2",
                   }
                 }}
               />

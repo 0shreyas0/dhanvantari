@@ -372,14 +372,14 @@ export default function BillingPage() {
               <CardHeader className="border-b border-border/40">
                 <CardTitle>Current Bill</CardTitle>
               </CardHeader>
-              <CardContent className="flex-1 p-0">
-                <Table>
+              <CardContent className="flex-1 p-0 overflow-x-auto">
+                <Table className="min-w-[600px] md:min-w-full">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Product</TableHead>
-                      <TableHead className="w-[100px]">Price</TableHead>
-                      <TableHead className="w-[120px]">Qty</TableHead>
-                      <TableHead className="w-[100px] text-right">Total</TableHead>
+                      <TableHead className="w-[80px] sm:w-[100px]">Price</TableHead>
+                      <TableHead className="w-[100px] sm:w-[120px]">Qty</TableHead>
+                      <TableHead className="w-[80px] sm:w-[100px] text-right">Total</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -388,9 +388,9 @@ export default function BillingPage() {
                       billItems.map(item => (
                         <TableRow key={item.id}>
                           <TableCell className="font-medium">
-                            <div className="flex flex-col gap-0.5">
-                                <span>{item.name}</span>
-                                <span className="text-xs text-muted-foreground">{item.barcodes}</span>
+                            <div className="flex flex-col gap-0.5 max-w-[150px] sm:max-w-none">
+                                <span className="truncate sm:whitespace-normal">{item.name}</span>
+                                <span className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">{item.barcodes}</span>
                                 {item.isNearExpiry && (
                                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-600/30 px-1.5 py-0.5 rounded w-fit">
                                     <AlertTriangle className="h-2.5 w-2.5" />
@@ -426,18 +426,18 @@ export default function BillingPage() {
                 </Table>
               </CardContent>
               <div className="p-6 bg-muted/20 border-t border-border/40 space-y-4">
-                <div className="grid grid-cols-2 gap-4 border-b border-border/40 pb-4">
+                <div className="grid grid-cols-1 min-[500px]:grid-cols-2 gap-4 border-b border-border/40 pb-4">
                   <div>
-                    <Label htmlFor="customerName" className="text-xs text-muted-foreground mb-1.5 block">Customer Name (Optional)</Label>
-                    <Input id="customerName" placeholder="e.g. Rahul Patil" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
+                    <Label htmlFor="customerName" className="text-xs text-muted-foreground mb-1.5 block">Customer Name</Label>
+                    <Input id="customerName" placeholder="e.g. Rahul Patil" value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="bg-background h-11 sm:h-10" onFocus={(e) => e.currentTarget.select()} />
                   </div>
                   <div>
-                    <Label htmlFor="customerPhone" className="text-xs text-muted-foreground mb-1.5 block">Phone Number (Optional)</Label>
-                    <Input id="customerPhone" placeholder="e.g. 9876543210" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
+                    <Label htmlFor="customerPhone" className="text-xs text-muted-foreground mb-1.5 block">Phone Number</Label>
+                    <Input id="customerPhone" placeholder="e.g. 9876543210" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="bg-background h-11 sm:h-10" onFocus={(e) => e.currentTarget.select()} />
                   </div>
-                  <div className="col-span-2 mt-2">
-                    <Label htmlFor="customerEmail" className="text-xs text-muted-foreground mb-1.5 block">Email Address (Optional)</Label>
-                    <Input id="customerEmail" type="email" placeholder="e.g. customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="bg-background" onFocus={(e) => e.currentTarget.select()} />
+                  <div className="min-[500px]:col-span-2 mt-2">
+                    <Label htmlFor="customerEmail" className="text-xs text-muted-foreground mb-1.5 block">Email Address</Label>
+                    <Input id="customerEmail" type="email" placeholder="e.g. customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="bg-background h-11 sm:h-10" onFocus={(e) => e.currentTarget.select()} />
                   </div>
                 </div>
 

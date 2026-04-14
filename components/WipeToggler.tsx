@@ -45,8 +45,8 @@ export function WipeToggler() {
         relative h-9 w-9 rounded-xl border border-border/50 transition-all duration-300
         flex items-center justify-center overflow-hidden
         ${isDark 
-          ? 'bg-zinc-900 text-yellow-400 hover:bg-zinc-800 shadow-[0_0_15px_-5px_theme(colors.yellow.400)]' 
-          : 'bg-white text-zinc-900 hover:bg-zinc-50 shadow-[0_0_15px_-5px_rgba(0,0,0,0.1)]'}
+          ? 'bg-zinc-900 text-yellow-500 hover:bg-zinc-800' 
+          : 'bg-white text-zinc-900 hover:bg-zinc-50'}
       `}
       aria-label="Toggle Theme"
     >

@@ -97,12 +97,14 @@ export default async function ProductsPage() {
   return (
     <PageContainer>
       <MainLayout>
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-center md:justify-between px-1">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Products</h1>
-              <p className="text-muted-foreground mt-2">Manage your inventory.</p>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Products</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1 leading-relaxed">Manage your inventory.</p>
             </div>
-            <AddProductDialog />
+            <div className="w-full md:w-auto">
+              <AddProductDialog />
+            </div>
         </div>
         <InventoryTable data={data} pharmacyName={pharmacyName} expirySettings={expirySettings} />
       </MainLayout>
