@@ -66,6 +66,21 @@ export async function GET(
     const boldFont = fs.readFileSync(FONT_BOLD)
     const mediumFont = fs.existsSync(FONT_MEDIUM) ? fs.readFileSync(FONT_MEDIUM) : regularFont
 
+    // 3.1 Pre-load Pharmacy Logo (if any) - Move outside Promise to support await
+    let pharmacyLogoBuffer = null
+    if (settings?.logoUrl) {
+      try {
+        const res = await fetch(settings.logoUrl)
+        if (res.ok) {
+          pharmacyLogoBuffer = Buffer.from(await res.arrayBuffer())
+        }
+      } catch (e) {
+        console.error("Failed to fetch pharmacy logo:", e)
+      }
+    }
+
+    const dhanvantariLogo = fs.readFileSync(path.join(process.cwd(), "public", "logo.png"))
+
     await new Promise<void>((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50, size: "A4", font: regularFont as any })
 
@@ -76,21 +91,6 @@ export async function GET(
       doc.on("data", (chunk: Buffer) => chunks.push(chunk))
       doc.on("end", resolve)
       doc.on("error", reject)
-
-      // ---- Pre-load Pharmacy Logo (if any) ----
-      let pharmacyLogoBuffer = null
-      if (settings?.logoUrl) {
-        try {
-          const res = await fetch(settings.logoUrl)
-          if (res.ok) {
-            pharmacyLogoBuffer = Buffer.from(await res.arrayBuffer())
-          }
-        } catch (e) {
-          console.error("Failed to fetch pharmacy logo:", e)
-        }
-      }
-
-      const dhanvantariLogo = fs.readFileSync(path.join(process.cwd(), "public/logo.png"))
 
       // ---- Branded Header Decoration ----
       doc.rect(0, 0, 595, 8).fillColor("#0f172a").fill()
