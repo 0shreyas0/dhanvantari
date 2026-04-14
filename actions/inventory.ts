@@ -26,10 +26,10 @@ export async function searchProducts(query: string) {
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     
     // Concatenate all batch barcodes for searching
-    const barcodes = med.batches.map(b => b.barcode).join(" ")
+    const barcodes = med.batches.map((b: any) => b.barcode).join(" ")
 
-    const availableBatches = med.batches.filter(b => b.quantity > 0)
-    availableBatches.sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+    const availableBatches = med.batches.filter((b: any) => b.quantity > 0)
+    availableBatches.sort((a: any, b: any) => a.expiryDate.getTime() - b.expiryDate.getTime())
     
     let isExpired = false
     let isExpiringSoon = false
@@ -50,7 +50,7 @@ export async function searchProducts(query: string) {
         isExpiringSoon = true
       }
     } else if (med.batches.length > 0 && stock === 0) {
-      const lastBatch = [...med.batches].sort((a,b) => b.expiryDate.getTime() - a.expiryDate.getTime())[0]
+      const lastBatch = [...med.batches].sort((a: any, b: any) => b.expiryDate.getTime() - a.expiryDate.getTime())[0]
       if (lastBatch.expiryDate < now) {
           isExpired = true
           expiryDate = lastBatch.expiryDate.toISOString()
@@ -495,7 +495,7 @@ export async function exportInventoryToCSV() {
   })
 
   // Flatten the data for CSV
-  const rows = medicines.flatMap(med => {
+  const rows = medicines.flatMap((med: any) => {
       if (med.batches.length === 0) {
               return [{
                   "Medicine Name": med.name,
