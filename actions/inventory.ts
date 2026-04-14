@@ -21,8 +21,8 @@ export async function searchProducts(query: string) {
   const thirtyDaysFromNow = new Date()
   thirtyDaysFromNow.setDate(now.getDate() + 30)
 
-  const formattedMedicines = medicines.map(med => {
-    const stock = med.batches.reduce((sum, b) => sum + b.quantity, 0)
+  const formattedMedicines = medicines.map((med: any) => {
+    const stock = med.batches.reduce((sum: number, b: any) => sum + b.quantity, 0)
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     
     // Concatenate all batch barcodes for searching
@@ -129,7 +129,7 @@ export async function processBill(
     }
   }
 
-  const totalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+  const totalAmount = items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0)
 
   const bill = await prisma.bill.create({
     data: {
@@ -204,7 +204,7 @@ export async function createMedicine(data: {
 
   const { name, barcode, category, description, lowStockThreshold, initialBatch } = data
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: any) => {
     let medicine = await tx.medicine.findFirst({
       where: { userId, name } // Searching by name as fallback unique key for medicine type
     })
@@ -511,7 +511,7 @@ export async function exportInventoryToCSV() {
               }]
       }
       
-      return med.batches.map(batch => {
+      return med.batches.map((batch: any) => {
           const isExpired = new Date(batch.expiryDate) < new Date()
           return {
               "Medicine Name": med.name,
@@ -558,7 +558,7 @@ export async function importInventoryFromCSV(rows: any[]) {
       const expiry = row["Expiry Date"] ? new Date(row["Expiry Date"]) : defaultExpiry
 
       // Use a transaction for each row to ensure medicine and batch are synced
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
           // 1. Find or create medicine by name
           let medicine = await tx.medicine.findFirst({
               where: { name, userId }
