@@ -210,11 +210,20 @@ A web-based system to manage inventory and generate bills using barcode scanning
 * No expiry tracking
 * Billing takes more time
 
-**Existing Software Issues:**
+**Examples of Existing Systems:**
 
-* Expensive
-* Complex to use
-* Requires training
+* Manual register-based stock and billing system
+* Excel or spreadsheet-based medicine records
+* Standalone desktop billing software used only at the counter
+
+**Limitations Compared to Our Project:**
+
+* Manual systems are slow and error-prone
+* Spreadsheet systems do not provide real-time barcode-based billing
+* Many desktop tools focus only on billing, not full inventory tracking
+* Expiry and low-stock alerts are limited or missing
+* Some solutions are expensive, complex, and require training
+* Data is not easily accessible from multiple systems through a browser
 
 ---
 
