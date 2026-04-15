@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, Save, Store, Clock } from "lucide-react"
+import { Loader2, Save, Store, Clock, Upload } from "lucide-react"
 import { getPharmacySettings, updatePharmacySettings, getExpirySettings, updateExpirySettings } from "@/actions/settings"
 import { toast } from "sonner"
 
@@ -15,6 +15,7 @@ export default function SettingsPage() {
   // ── Pharmacy settings ────────────────────────────────────────────────────────
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [formData, setFormData] = useState({ name: "My Pharmacy", phone: "", address: "", logoUrl: "" })
 
   // ── Expiry settings ──────────────────────────────────────────────────────────
@@ -60,6 +61,36 @@ export default function SettingsPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    const formData = new FormData()
+    formData.append("logo", file)
+
+    try {
+      const res = await fetch("/api/settings/logo", {
+        method: "POST",
+        body: formData,
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.error || "Upload failed")
+      }
+      const data = await res.json()
+      if (data.logoUrl || data.url) {
+        setFormData(prev => ({ ...prev, logoUrl: data.logoUrl ?? data.url }))
+        toast.success("Logo uploaded and staging — save to persist!")
+      }
+    } catch (err: any) {
+      console.error(err)
+      toast.error(err.message || "Failed to upload image.")
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -156,9 +187,41 @@ export default function SettingsPage() {
                              )}
                           </div>
                           <div className="space-y-1.5 flex-1">
-                             <Label htmlFor="logoUrl">Pharmacy Logo URL</Label>
-                             <Input id="logoUrl" name="logoUrl" value={formData.logoUrl} onChange={handleChange} placeholder="https://example.com/logo.png" className="h-9" />
-                             <p className="text-[10px] text-muted-foreground">Provide a link to your pharmacy logo (square works best).</p>
+                             <Label>Pharmacy Logo</Label>
+                             <div className="flex items-center gap-3">
+                               <div className="relative">
+                                 <input
+                                   type="file"
+                                   id="logo-upload"
+                                   className="hidden"
+                                   accept="image/*"
+                                   onChange={handleFileUpload}
+                                 />
+                                 <Button 
+                                   type="button" 
+                                   variant="outline" 
+                                   size="sm" 
+                                   className="h-9"
+                                   disabled={isUploading}
+                                   onClick={() => document.getElementById("logo-upload")?.click()}
+                                 >
+                                   {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                                   {isUploading ? "Uploading..." : "Upload New Logo"}
+                                 </Button>
+                               </div>
+                               {formData.logoUrl && (
+                                 <Button
+                                   type="button"
+                                   variant="ghost"
+                                   size="sm"
+                                   className="h-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                   onClick={() => setFormData(prev => ({ ...prev, logoUrl: "" }))}
+                                 >
+                                   Remove
+                                 </Button>
+                               )}
+                             </div>
+                             <p className="text-[10px] text-muted-foreground">Upload your store logo. It will be stored securely in Supabase Storage.</p>
                           </div>
                        </div>
                     </div>

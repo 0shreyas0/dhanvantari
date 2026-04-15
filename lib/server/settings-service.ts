@@ -51,6 +51,22 @@ export async function updatePharmacySettingsForUser(userId: string, data: Pharma
   })
 }
 
+export async function updatePharmacyLogoForUser(userId: string, logoUrl: string) {
+  return prisma.pharmacySettings.upsert({
+    where: { userId },
+    update: {
+      logoUrl,
+    },
+    create: {
+      userId,
+      name: "My Pharmacy",
+      phone: "",
+      address: "",
+      logoUrl,
+    },
+  })
+}
+
 export async function getOrCreateExpirySettings(userId: string) {
   let settings = await prisma.expirySettings.findUnique({
     where: { userId },
