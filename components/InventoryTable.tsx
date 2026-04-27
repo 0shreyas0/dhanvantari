@@ -564,7 +564,7 @@ export default function InventoryTable({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <StatusBadge status={med.status} />
+                          <StatusBadge status={viewMode === "history" ? "Completed" : med.status} />
                           {(med.recalledCount ?? 0) > 0 && med.status !== "Recalled" && (
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-orange-600 dark:text-orange-400 bg-orange-500/10 border border-orange-200 dark:border-orange-500/20 px-1.5 py-0.5 rounded-full">
                               <AlertTriangle className="h-3 w-3" />
@@ -626,7 +626,7 @@ export default function InventoryTable({
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
-                              <StatusBadge status={batchStatus} />
+                              {viewMode !== "history" && <StatusBadge status={batchStatus} />}
                               <AddBatchDialog
                                 medicineId={med.id}
                                 medicineName={med.name}
