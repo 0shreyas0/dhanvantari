@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "../components/theme-provider";
 import "./globals.css";
 
@@ -24,6 +25,11 @@ const googleSans = localFont({
   variable: "--font-google-sans",
 });
 
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-playfair",
+});
+
 export const metadata: Metadata = {
   title: "Dhanvantari",
   description: "Simple inventory management for pharmacies",
@@ -44,7 +50,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <body
-          className={`${googleSans.variable} antialiased font-sans`}
+          className={`${googleSans.variable} ${playfair.variable} antialiased font-sans`}
         >
           <ThemeProvider
             attribute="class"

@@ -123,7 +123,7 @@ export default function LandingPage() {
             Built for Indian Pharmacies
           </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[1.05] mb-6">
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-playfair font-black tracking-tight leading-[1.05] mb-6">
             <span className="text-foreground">The Smarter Way</span>
             <br />
             <span className="bg-gradient-to-r from-primary via-purple-400 to-cyan-400 bg-clip-text text-transparent">

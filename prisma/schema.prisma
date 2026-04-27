@@ -92,6 +92,7 @@ model Bill {
   gstAmount      Float @default(0)
   totalAmount Float
 
+  paymentMethod  String @default("Cash")
   createdAt DateTime @default(now())
 }
 

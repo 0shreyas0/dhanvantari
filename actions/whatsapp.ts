@@ -20,7 +20,8 @@ export async function sendWhatsAppReceipt(
     totalAmount: number
   },
   items: { name: string, quantity: number, price: number }[],
-  pharmacyName: string
+  pharmacyName: string,
+  paymentMethod?: string
 ) {
   if (!accountSid || !authToken) {
     console.error("Twilio credentials missing")
@@ -51,7 +52,8 @@ export async function sendWhatsAppReceipt(
       `--------------------------\n` +
       `*Customer:* ${customerName || 'Valued Customer'}\n` +
       `*Receipt ID:* ${billId.slice(-6).toUpperCase()}\n` +
-      `*Date:* ${new Date().toLocaleDateString()}\n\n` +
+      `*Date:* ${new Date().toLocaleDateString()}\n` +
+      `*Payment:* ${paymentMethod || 'Cash'}\n\n` +
       `*Items Dispensed:*\n${itemsList}\n\n` +
       `Subtotal: ₹${totals.subtotalAmount.toFixed(2)}\n` +
       `GST (${totals.gstRate.toFixed(0)}%): ₹${totals.gstAmount.toFixed(2)}\n` +

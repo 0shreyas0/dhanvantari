@@ -24,7 +24,8 @@ export async function sendEmailReceipt(
     totalAmount: number
   },
   items: { name: string, quantity: number, price: number }[],
-  pharmacyName: string
+  pharmacyName: string,
+  paymentMethod?: string
 ) {
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.error("Email credentials missing")
@@ -83,10 +84,12 @@ export async function sendEmailReceipt(
             <div>
               <p style="margin: 0; color: #64748b; font-size: 14px;">BILL TO:</p>
               <h3 style="margin: 5px 0 0 0;">${customerName || 'Valued Customer'}</h3>
+              <p style="margin: 8px 0 0 0; color: #64748b; font-size: 12px;">Payment: <strong>${paymentMethod || 'Cash'}</strong></p>
             </div>
             <div style="text-align: right;">
               <p style="margin: 0; color: #64748b; font-size: 14px;">BILL ID:</p>
               <h3 style="margin: 5px 0 0 0;">#${billId.slice(-8).toUpperCase()}</h3>
+              <p style="margin: 8px 0 0 0; color: #64748b; font-size: 12px;">Date: ${new Date().toLocaleDateString()}</p>
             </div>
           </div>
           

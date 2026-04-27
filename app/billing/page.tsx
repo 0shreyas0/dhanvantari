@@ -13,7 +13,7 @@ import { searchProducts, processBill, getBillDetails } from "@/actions/inventory
 import { sendWhatsAppReceipt } from "@/actions/whatsapp"
 import { sendEmailReceipt } from "@/actions/email"
 import { getExpirySettings } from "@/actions/settings"
-import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download } from "lucide-react"
+import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download, CreditCard, Banknote, Smartphone } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -56,6 +56,7 @@ export default function BillingPage() {
   const [customerName, setCustomerName] = useState("")
   const [customerPhone, setCustomerPhone] = useState("")
   const [customerEmail, setCustomerEmail] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState("Cash")
 
   // Expiry settings (loaded once)
   const [expirySettings, setExpirySettings] = useState<ExpirySettings>(DEFAULT_EXPIRY_SETTINGS)
@@ -198,7 +199,7 @@ export default function BillingPage() {
         price: item.price,
       }))
       
-      const result = await processBill(payload as any, { name: customerName, phone: customerPhone })
+      const result = await processBill(payload as any, { name: customerName, phone: customerPhone }, paymentMethod)
       if (result.success && result.billId) {
         const details = await getBillDetails(result.billId)
         setLastBill(details)
@@ -244,7 +245,8 @@ export default function BillingPage() {
           quantity: item.quantity,
           price: item.price,
         })),
-        lastBill.pharmacyName
+        lastBill.pharmacyName,
+        lastBill.paymentMethod
       )
       if (result.success) {
           toast.success("Receipt sent via WhatsApp!")
@@ -282,7 +284,8 @@ export default function BillingPage() {
           quantity: item.quantity,
           price: item.price,
         })),
-        lastBill.pharmacyName
+        lastBill.pharmacyName,
+        lastBill.paymentMethod
       )
       if (result.success) {
           toast.success("Email receipt sent successfully!")
@@ -438,6 +441,20 @@ export default function BillingPage() {
                     <Label htmlFor="customerEmail" className="text-xs text-muted-foreground mb-1.5 block">Email Address</Label>
                     <Input id="customerEmail" type="email" placeholder="e.g. customer@example.com" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} className="bg-background h-11 sm:h-10" onFocus={(e) => e.currentTarget.select()} />
                   </div>
+                </div>
+
+                <div className="space-y-2 py-2 border-b border-border/40">
+                  <Label htmlFor="paymentMethod" className="text-xs text-muted-foreground block">Payment Method</Label>
+                  <select
+                    id="paymentMethod"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="h-11 sm:h-10 w-full rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="Cash">Cash Payment</option>
+                    <option value="UPI">UPI / Digital Transfer</option>
+                    <option value="Card">Credit / Debit Card</option>
+                  </select>
                 </div>
 
                 <div className="space-y-2 pt-2 mb-4">
@@ -617,6 +634,15 @@ export default function BillingPage() {
                <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Customer:</span>
                   <span className="font-medium">{lastBill?.customerName || "Walk-in Customer"}</span>
+               </div>
+               <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Payment:</span>
+                  <span className="font-medium inline-flex items-center gap-1.5">
+                    {lastBill?.paymentMethod === "Cash" && <Banknote className="h-3 w-3" />}
+                    {lastBill?.paymentMethod === "UPI" && <Smartphone className="h-3 w-3" />}
+                    {lastBill?.paymentMethod === "Card" && <CreditCard className="h-3 w-3" />}
+                    {lastBill?.paymentMethod || "Cash"}
+                  </span>
                </div>
                <div className="flex justify-between text-sm pt-2 border-t border-border">
                   <span className="text-muted-foreground">Subtotal:</span>

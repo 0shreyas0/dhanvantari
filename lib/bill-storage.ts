@@ -135,7 +135,8 @@ export async function getBillWithItems(billId: string, userId?: string) {
 export async function createBillWithItems(
   userId: string,
   items: { medicineId: string; quantity: number; price: number }[],
-  customer?: { name?: string; phone?: string }
+  customer?: { name?: string; phone?: string },
+  paymentMethod: string = "Cash"
 ) {
   const summary = calculateBillSummaryFromItems(items)
 
@@ -145,6 +146,7 @@ export async function createBillWithItems(
         userId,
         customerName: customer?.name || null,
         customerPhone: customer?.phone || null,
+        paymentMethod,
         subtotalAmount: summary.subtotalAmount,
         gstRate: summary.gstRate,
         gstAmount: summary.gstAmount,
@@ -165,13 +167,14 @@ export async function createBillWithItems(
 
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw(Prisma.sql`
-        INSERT INTO "Bill" ("id", "userId", "customerName", "customerPhone", "totalAmount", "createdAt")
+        INSERT INTO "Bill" ("id", "userId", "customerName", "customerPhone", "totalAmount", "paymentMethod", "createdAt")
         VALUES (
           ${billId},
           ${userId},
           ${customer?.name || null},
           ${customer?.phone || null},
           ${summary.totalAmount},
+          ${paymentMethod},
           NOW()
         )
       `)
