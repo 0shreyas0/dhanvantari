@@ -353,7 +353,7 @@ export default function InventoryTable({
     if (!p) return false
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.barcodes && p.barcodes.includes(searchQuery))
+      p.barcodes.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === "all" || p.status === statusFilter
     
     const matchesExpiry = expiryFilter === "all" || p.batches.some(b => {
