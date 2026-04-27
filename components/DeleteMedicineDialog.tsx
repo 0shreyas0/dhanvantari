@@ -84,7 +84,7 @@ export function DeleteMedicineDialog({ medicineId, medicineName, batchCount }: D
           </div>
         )}
 
-        <DialogFooter className="gap-2 mt-2">
+        <DialogFooter className="flex gap-3 mt-2 sm:justify-end">
           <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
             Cancel
           </Button>

@@ -22,7 +22,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { PrintBarcodeButton } from "@/components/PrintBarcodeButton"
-import { toggleRecallBatch, exportInventoryToCSV, importInventoryFromCSV } from "@/actions/inventory"
+import { toggleRecallBatch, toggleCompleteBatch, deleteBatch, exportInventoryToCSV, importInventoryFromCSV } from "@/actions/inventory"
 import { useRouter } from "next/navigation"
 import {
   Download,
@@ -35,6 +35,11 @@ import {
   Layers,
   Table as TableIcon,
   Globe,
+  CheckCircle2,
+  History,
+  ClipboardList,
+  Check,
+  Trash2,
 } from "lucide-react"
 import {
   Dialog,
@@ -46,7 +51,7 @@ import {
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { ExpiryBadge } from "@/components/ExpiryBadge"
-import { ExpirySettings, DEFAULT_EXPIRY_SETTINGS } from "@/lib/expiry"
+import { ExpirySettings, DEFAULT_EXPIRY_SETTINGS, getExpiryStatus } from "@/lib/expiry"
 import { AddBatchDialog } from "@/components/AddBatchDialog"
 import { DeleteMedicineDialog } from "@/components/DeleteMedicineDialog"
 
@@ -61,6 +66,7 @@ interface Batch {
   sellingPrice: number
   expiryDate: string   // ISO string
   isRecalled: boolean
+  isCompleted: boolean
 }
 
 interface Product {
@@ -87,7 +93,9 @@ interface InventoryTableProps {
 
 function StatusBadge({ status }: { status: string }) {
   const cls =
-    status === "Recalled"
+    status === "Completed"
+      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400 font-bold"
+      : status === "Recalled"
       ? "bg-red-500/20 text-red-700 border-red-500 dark:text-red-400 font-bold"
       : status === "Out of Stock"
       ? "bg-destructive/10 text-destructive border-destructive/20"
@@ -116,6 +124,11 @@ export default function InventoryTable({
   const [isGSheetModalOpen, setIsGSheetModalOpen] = useState(false)
   const [gsheetUrl, setGsheetUrl] = useState("")
   const [isGSheetLoading, setIsGSheetLoading] = useState(false)
+  const [viewMode, setViewMode] = useState<"active" | "history">("active")
+  const [expiryFilter, setExpiryFilter] = useState("all")
+  const [confirmCompleteId, setConfirmCompleteId] = useState<string | null>(null)
+  const [confirmRecallId, setConfirmRecallId] = useState<string | null>(null)
+  const [confirmDeleteBatchId, setConfirmDeleteBatchId] = useState<string | null>(null)
   const router = useRouter()
 
   const handleGSheetImport = async () => {
@@ -194,9 +207,36 @@ export default function InventoryTable({
     })
 
   const handleToggleRecall = async (batchId: string) => {
-    if (!confirm("Toggle recall status for this batch? Recalled batches cannot be sold.")) return
+    setConfirmRecallId(batchId)
+  }
+
+  const handleToggleComplete = async (batchId: string) => {
+    setConfirmCompleteId(batchId)
+  }
+
+  const executeToggleRecall = async (batchId: string) => {
     await toggleRecallBatch(batchId)
+    setConfirmRecallId(null)
     router.refresh()
+    toast.success("Batch recall status updated")
+  }
+
+  const executeToggleComplete = async (batchId: string) => {
+    await toggleCompleteBatch(batchId)
+    setConfirmCompleteId(null)
+    router.refresh()
+    toast.success(viewMode === "active" ? "Batch moved to history" : "Batch restored to catalog")
+  }
+
+  const handleDeleteBatch = async (batchId: string) => {
+    setConfirmDeleteBatchId(batchId)
+  }
+
+  const executeDeleteBatch = async (batchId: string) => {
+    await deleteBatch(batchId)
+    setConfirmDeleteBatchId(null)
+    router.refresh()
+    toast.success("Batch permanently deleted")
   }
 
   const handleExport = async (mode: 'download' | 'copy' = 'download') => {
@@ -291,22 +331,78 @@ export default function InventoryTable({
     reader.readAsText(file)
   }
 
-  const filteredData = data.filter(p => {
+  const filteredData = data.map(p => {
+    // Filter batches based on viewMode
+    const filteredBatches = p.batches.filter(b => 
+      viewMode === "active" ? !b.isCompleted : b.isCompleted
+    )
+    
+    if (filteredBatches.length === 0) return null
+    
+    // Recalculate stock and status for the filtered view
+    const activeStock = filteredBatches.filter(b => !b.isRecalled).reduce((sum, b) => sum + b.quantity, 0)
+    const totalStock = filteredBatches.reduce((sum, b) => sum + b.quantity, 0)
+    
+    return {
+      ...p,
+      batches: filteredBatches,
+      totalStock,
+      // Update status for the view if needed, or keep original
+    }
+  }).filter((p): p is Product => {
+    if (!p) return false
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.barcodes && p.barcodes.includes(searchQuery))
     const matchesStatus = statusFilter === "all" || p.status === statusFilter
-    return matchesSearch && matchesStatus
+    
+    const matchesExpiry = expiryFilter === "all" || p.batches.some(b => {
+      const status = getExpiryStatus(new Date(b.expiryDate), expirySettings)
+      if (expiryFilter === "expired") return status.color === 'gray'
+      if (expiryFilter === "critical") return status.color === 'red'
+      if (expiryFilter === "urgent") return status.color === 'orange'
+      if (expiryFilter === "early") return status.color === 'yellow'
+      return true
+    })
+
+    return matchesSearch && matchesStatus && matchesExpiry
   })
 
   return (
     <Card className="border-border/40 shadow-sm">
       {/* ── Header ── */}
       <CardHeader className="border-b border-border/40 px-4 sm:px-6 py-5">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-xl font-bold tracking-tight">Inventory List</CardTitle>
-            <p className="text-xs text-muted-foreground sm:hidden">Manage and track your products.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-xl font-bold tracking-tight">Inventory List</CardTitle>
+              <p className="text-xs text-muted-foreground sm:hidden">Manage and track your products.</p>
+            </div>
+            
+            {/* View Mode Toggle */}
+            <div className="flex items-center bg-muted/50 p-1 rounded-lg border border-border/50">
+              <button
+                onClick={() => setViewMode("active")}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  viewMode === "active" 
+                    ? "bg-background text-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                Active Catalog
+              </button>
+              <button
+                onClick={() => setViewMode("history")}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  viewMode === "history" 
+                    ? "bg-background text-foreground shadow-sm" 
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <History className="h-3.5 w-3.5" />
+                History
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center w-full lg:w-auto">
@@ -331,6 +427,17 @@ export default function InventoryTable({
                     <option value="Low Stock">Low Stock</option>
                     <option value="Out of Stock">Out of Stock</option>
                     <option value="Recalled">Recalled</option>
+                </select>
+                <select
+                    value={expiryFilter}
+                    onChange={e => setExpiryFilter(e.target.value)}
+                    className="h-11 sm:h-10 w-full min-[450px]:w-[160px] rounded-md border border-input bg-card px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring shrink-0"
+                >
+                    <option value="all">All Expiry</option>
+                    <option value="expired">Expired</option>
+                    <option value="critical">Critical Tier</option>
+                    <option value="urgent">Urgent Tier</option>
+                    <option value="early">Early Warning</option>
                 </select>
             </div>
 
@@ -386,7 +493,6 @@ export default function InventoryTable({
               <input id="csv-upload" type="file" className="hidden" accept=".csv" onChange={handleImport} />
             </div>
           </div>
-        </div>
       </CardHeader>
 
       {/* ── Table ── */}
@@ -482,7 +588,7 @@ export default function InventoryTable({
                     {/* ── Per-batch sub-rows ── */}
                     {isOpen && med.batches.map((batch, idx) => {
                       const isExpired = new Date(batch.expiryDate) < new Date()
-                      const batchStatus = batch.isRecalled ? "Recalled" : isExpired ? "Expired" : batch.quantity === 0 ? "Out of Stock" : "In Stock"
+                      const batchStatus = batch.isCompleted ? "Completed" : batch.isRecalled ? "Recalled" : isExpired ? "Expired" : batch.quantity === 0 ? "Out of Stock" : "In Stock"
 
                       return (
                         <TableRow
@@ -541,6 +647,20 @@ export default function InventoryTable({
                               >
                                 <AlertTriangle className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={() => handleToggleComplete(batch.id)}
+                                className={`p-1 rounded hover:bg-muted ${batch.isCompleted ? "text-emerald-500" : "text-muted-foreground/40 hover:text-emerald-500"}`}
+                                title={batch.isCompleted ? "Mark as Active" : "Mark as Completed"}
+                              >
+                                {batch.isCompleted ? <History className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteBatch(batch.id)}
+                                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground/40 hover:text-destructive transition-colors"
+                                title="Delete Batch"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
                           </TableCell>
                           <TableCell />
@@ -561,6 +681,89 @@ export default function InventoryTable({
         </Table>
         </div>
       </CardContent>
+
+      <Dialog open={!!confirmCompleteId} onOpenChange={(open) => !open && setConfirmCompleteId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewMode === "active" ? (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  Complete Batch
+                </>
+              ) : (
+                <>
+                  <History className="h-5 w-5 text-primary" />
+                  Restore Batch
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              {viewMode === "active" 
+                ? "Are you sure you want to mark this batch as completed? It will be moved to the history view."
+                : "Are you sure you want to restore this batch to the active catalog?"}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirmCompleteId(null)}>Cancel</Button>
+            <Button 
+              className={viewMode === "active" ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-primary"}
+              onClick={() => confirmCompleteId && executeToggleComplete(confirmCompleteId)}
+            >
+              {viewMode === "active" ? "Complete Batch" : "Restore Batch"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmRecallId} onOpenChange={(open) => !open && setConfirmRecallId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Toggle Recall Status
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              Are you sure you want to toggle the recall status for this batch? 
+              Recalled batches are flagged and cannot be sold in the billing terminal.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirmRecallId(null)}>Cancel</Button>
+            <Button 
+              variant="destructive"
+              onClick={() => confirmRecallId && executeToggleRecall(confirmRecallId)}
+            >
+              Confirm Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!confirmDeleteBatchId} onOpenChange={(open) => !open && setConfirmDeleteBatchId(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Batch?
+            </DialogTitle>
+            <DialogDescription className="pt-2 text-base">
+              You are about to permanently delete this batch. 
+              This will also remove all associated serial numbers.
+              <span className="block mt-2 font-bold text-destructive">This action cannot be undone.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-3 sm:justify-end">
+            <Button variant="outline" onClick={() => setConfirmDeleteBatchId(null)}>Cancel</Button>
+            <Button 
+              variant="destructive"
+              onClick={() => confirmDeleteBatchId && executeDeleteBatch(confirmDeleteBatchId)}
+            >
+              Yes, Delete Batch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isGSheetModalOpen} onOpenChange={setIsGSheetModalOpen}>
         <DialogContent className="sm:max-w-[425px]">

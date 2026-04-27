@@ -227,6 +227,28 @@ export async function toggleRecallBatch(batchId: string) {
   return { success: true, isRecalled: updatedBatch.isRecalled }
 }
 
+export async function toggleCompleteBatch(batchId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  const batch = await prisma.batch.findUnique({
+    where: { id: batchId },
+    include: { medicine: true }
+  })
+
+  // Ensure user owns this medicine
+  if (!batch || batch.medicine.userId !== userId) {
+    throw new Error("Unauthorized or Batch Not Found")
+  }
+
+  const updatedBatch = await prisma.batch.update({
+    where: { id: batchId },
+    data: { isCompleted: !batch.isCompleted }
+  })
+
+  return { success: true, isCompleted: updatedBatch.isCompleted }
+}
+
 // ─── Delete a medicine and all its associated data ─────────────────────────────
 
 export async function deleteMedicine(medicineId: string) {
@@ -480,4 +502,32 @@ export async function updateBatch(batchId: string, data: {
   })
 
   return batch
+}
+
+export async function deleteBatch(batchId: string) {
+  const { userId } = await auth()
+  if (!userId) throw new Error("Unauthorized")
+
+  // Verify ownership via medicine
+  const batch = await prisma.batch.findUnique({
+    where: { id: batchId },
+    include: { medicine: true }
+  })
+
+  if (!batch || batch.medicine.userId !== userId) {
+    throw new Error("Unauthorized or Batch Not Found")
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Delete associated serial numbers
+    await tx.serialNumber.deleteMany({
+      where: { batchId }
+    })
+    // 2. Delete the batch
+    await tx.batch.delete({
+      where: { id: batchId }
+    })
+  })
+
+  return { success: true }
 }

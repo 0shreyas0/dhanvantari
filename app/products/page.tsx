@@ -90,6 +90,7 @@ export default async function ProductsPage() {
         sellingPrice: b.sellingPrice,
         expiryDate: b.expiryDate.toISOString(),
         isRecalled: b.isRecalled,
+        isCompleted: b.isCompleted,
       })),
     }
   })

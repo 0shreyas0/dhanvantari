@@ -44,7 +44,8 @@ model Batch {
 
   expiryDate DateTime
 
-  isRecalled Boolean @default(false)
+  isRecalled  Boolean @default(false)
+  isCompleted Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

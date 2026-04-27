@@ -70,7 +70,7 @@ function AlertSection({
                   Batch: <span className="font-mono">{item.batchNumber}</span>
                   &nbsp;·&nbsp;
                   {item.daysRemaining <= 0
-                    ? <span className="text-destructive font-medium">Expired {Math.abs(item.daysRemaining)}d ago</span>
+                    ? <span className="text-red-600 dark:text-red-400 font-medium">Expired {Math.abs(item.daysRemaining)}d ago</span>
                     : <span>{item.daysRemaining} day{item.daysRemaining === 1 ? "" : "s"} left</span>
                   }
                   &nbsp;·&nbsp;
@@ -91,6 +91,7 @@ function AlertSection({
 }
 
 export default function ExpiryAlertsCard({ critical, urgent, early, settings }: ExpiryAlertsCardProps) {
+  const [tierFilter, setTierFilter] = useState("all")
   const totalCount = critical.length + urgent.length + early.length
   const isEmpty = totalCount === 0
 
@@ -101,6 +102,16 @@ export default function ExpiryAlertsCard({ critical, urgent, early, settings }: 
         <div className="flex items-center gap-2">
           <span className="text-lg">⏳</span>
           <h3 className="font-semibold text-foreground">Expiry Alerts</h3>
+          <select 
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value)}
+            className="ml-2 bg-transparent border-none text-[10px] font-bold text-muted-foreground hover:text-foreground focus:ring-0 cursor-pointer outline-none"
+          >
+            <option value="all">All Tiers</option>
+            <option value="critical">Critical Only</option>
+            <option value="urgent">Urgent Only</option>
+            <option value="early">Early Only</option>
+          </select>
         </div>
         <div className="flex items-center gap-3">
           {isEmpty ? (
@@ -108,7 +119,7 @@ export default function ExpiryAlertsCard({ critical, urgent, early, settings }: 
               All clear
             </span>
           ) : (
-            <span className="text-xs font-medium px-2.5 py-1 bg-destructive/10 text-destructive rounded-full">
+            <span className="text-xs font-medium px-2.5 py-1 bg-red-500/10 text-red-600 dark:text-red-400 rounded-full border border-red-500/20">
               {totalCount} item{totalCount !== 1 ? "s" : ""}
             </span>
           )}
@@ -132,27 +143,33 @@ export default function ExpiryAlertsCard({ critical, urgent, early, settings }: 
         </div>
       ) : (
         <div>
-          <AlertSection
-            label={`Critical (within ${settings.criticalDays} days)`}
-            emoji="🔴"
-            color="text-destructive"
-            items={critical}
-            defaultOpen={true}
-          />
-          <AlertSection
-            label={`Urgent (within ${settings.urgentWarningDays} days)`}
-            emoji="🟠"
-            color="text-orange-600 dark:text-orange-400"
-            items={urgent}
-            defaultOpen={true}
-          />
-          <AlertSection
-            label={`Early Warning (within ${settings.earlyWarningDays} days)`}
-            emoji="🟡"
-            color="text-yellow-600 dark:text-yellow-400"
-            items={early}
-            defaultOpen={false}
-          />
+          {(tierFilter === "all" || tierFilter === "critical") && (
+            <AlertSection
+              label={`Critical (within ${settings.criticalDays} days)`}
+              emoji="🔴"
+              color="text-red-600 dark:text-red-400"
+              items={critical}
+              defaultOpen={true}
+            />
+          )}
+          {(tierFilter === "all" || tierFilter === "urgent") && (
+            <AlertSection
+              label={`Urgent (within ${settings.urgentWarningDays} days)`}
+              emoji="🟠"
+              color="text-orange-600 dark:text-orange-400"
+              items={urgent}
+              defaultOpen={true}
+            />
+          )}
+          {(tierFilter === "all" || tierFilter === "early") && (
+            <AlertSection
+              label={`Early Warning (within ${settings.earlyWarningDays} days)`}
+              emoji="🟡"
+              color="text-yellow-600 dark:text-yellow-400"
+              items={early}
+              defaultOpen={false}
+            />
+          )}
         </div>
       )}
     </div>

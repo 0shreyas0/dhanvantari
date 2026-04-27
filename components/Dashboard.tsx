@@ -105,7 +105,7 @@ export default function Dashboard({ stats }: DashboardProps) {
                   </div>
                 </div>
                 <div>
-                  <div className={`text-2xl font-bold font-sans tracking-tight ${!isHealthyStock ? 'text-red-500' : ''}`}>
+                  <div className={`text-2xl font-bold font-sans tracking-tight ${!isHealthyStock ? 'text-red-500 dark:text-red-400' : ''}`}>
                     {Math.round(stats.stockHealth * 100)}%
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
