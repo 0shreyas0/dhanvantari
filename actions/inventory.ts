@@ -437,9 +437,14 @@ export async function importInventoryFromCSV(rows: any[]) {
       const name = row["Medicine Name"]
       if (!name || name.toLowerCase().includes("medicine name")) continue
 
-      // Use a consistent internal barcode/batch generation policy
-      const barcode = Date.now().toString().slice(-8) + Math.floor(Math.random() * 100000).toString().padStart(5, '0')
-      const batchNumber = "B-" + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      // Use provided barcode/batch from sheet if they exist, otherwise generate
+      const barcode = row["Barcode"] && row["Barcode"] !== "N/A" 
+        ? row["Barcode"] 
+        : Date.now().toString().slice(-8) + Math.floor(Math.random() * 100000).toString().padStart(5, '0')
+      
+      const batchNumber = row["Batch No."] && row["Batch No."] !== "N/A"
+        ? row["Batch No."]
+        : "B-" + Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 
       const quantity = Math.floor(parseNum(row["Stock"]))
       const sellingPrice = parseNum(row["Selling Price"])
@@ -463,17 +468,35 @@ export async function importInventoryFromCSV(rows: any[]) {
               })
           }
 
-          await tx.batch.create({
-              data: {
-                  medicineId: medicine.id,
-                  barcode,
-                  batchNumber,
-                  quantity,
-                  sellingPrice,
-                  costPrice,
-                  expiryDate: expiry
-              }
+          // check if batch already exists for this medicine to avoid duplicates
+          const existingBatch = await tx.batch.findFirst({
+              where: { medicineId: medicine.id, batchNumber }
           })
+
+          if (existingBatch) {
+              await tx.batch.update({
+                  where: { id: existingBatch.id },
+                  data: {
+                      barcode,
+                      quantity: existingBatch.quantity + quantity, // Add to existing stock if same batch? Or just update?
+                      sellingPrice,
+                      costPrice,
+                      expiryDate: expiry
+                  }
+              })
+          } else {
+              await tx.batch.create({
+                  data: {
+                      medicineId: medicine.id,
+                      barcode,
+                      batchNumber,
+                      quantity,
+                      sellingPrice,
+                      costPrice,
+                      expiryDate: expiry
+                  }
+              })
+          }
       })
       successCount++
     } catch (e) {
