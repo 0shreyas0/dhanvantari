@@ -13,11 +13,11 @@ import { searchProducts, processBill, getBillDetails } from "@/actions/inventory
 import { sendWhatsAppReceipt } from "@/actions/whatsapp"
 import { sendEmailReceipt } from "@/actions/email"
 import { getExpirySettings } from "@/actions/settings"
-import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download, CreditCard, Banknote, Smartphone, FileText, X } from "lucide-react"
+import { Loader2, Plus, Trash2, Search, CheckCircle2, MessageCircle, Mail, ScanBarcode, ImageUp, AlertTriangle, Download, CreditCard, Banknote, Smartphone, FileText, ClipboardList } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { useUploadThing } from "@/lib/uploadthing"
+import PrescriptionModal from "@/components/PrescriptionModal"
 import {
   Dialog,
   DialogContent,
@@ -76,25 +76,13 @@ export default function BillingPage() {
   const [emailSent, setEmailSent] = useState(false)
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [lastCustomerEmail, setLastCustomerEmail] = useState("")
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Prescription upload state
+  // Separate refs for barcode file vs prescription file
+  const barcodeFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Prescription state
   const [prescriptionUrl, setPrescriptionUrl] = useState<string | null>(null)
-  const [isUploadingPrescription, setIsUploadingPrescription] = useState(false)
-
-  const { startUpload } = useUploadThing("prescriptionUpload", {
-    onUploadBegin: () => setIsUploadingPrescription(true),
-    onClientUploadComplete: (res) => {
-      const url = res?.[0]?.ufsUrl
-      if (url) setPrescriptionUrl(url)
-      setIsUploadingPrescription(false)
-      toast.success("Prescription uploaded & attached to bill")
-    },
-    onUploadError: (err) => {
-      setIsUploadingPrescription(false)
-      toast.error(err.message || "Prescription upload failed")
-    },
-  })
+  const [prescriptionModalOpen, setPrescriptionModalOpen] = useState(false)
 
   // Debounce ref for barcode scanner
   const lastScannedRef = useRef<{ code: string; time: number }>({ code: "", time: 0 })
@@ -236,6 +224,7 @@ export default function BillingPage() {
         setCustomerPhone("")
         setCustomerEmail("")
         setPrescriptionUrl(null)
+        setPrescriptionModalOpen(false)
         toast.success("Bill processed successfully")
       } else {
         toast.error(result.error || "Failed to process bill.")
@@ -326,64 +315,54 @@ export default function BillingPage() {
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Barcode-from-file: scan only, no upload
+  const handleBarcodeFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // 1. Upload to UploadThing for persistent storage
-    startUpload([file])
-
-    // 2. Run local barcode scan on the file simultaneously
-    toast.loading("Scanning for barcodes...")
-    
+    const toastId = toast.loading("Scanning image for barcode…")
     try {
       let fileToScan = file
-      
+
       if (file.type === "application/pdf") {
         const pdfJS = await import("pdfjs-dist")
         pdfJS.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfJS.version}/build/pdf.worker.min.mjs`
-        
         const arrayBuffer = await file.arrayBuffer()
         const pdf = await pdfJS.getDocument({ data: arrayBuffer }).promise
         const page = await pdf.getPage(1)
-        
         const viewport = page.getViewport({ scale: 4.0 })
         const canvas = document.createElement("canvas")
         const context = canvas.getContext("2d")
         canvas.height = viewport.height
         canvas.width = viewport.width
-        
         if (context) {
           context.fillStyle = "white"
           context.fillRect(0, 0, canvas.width, canvas.height)
           await page.render({ canvasContext: context, viewport, canvas } as any).promise
-          const dataUrl = canvas.toDataURL("image/png")
-          const blob = await (await fetch(dataUrl)).blob()
-          fileToScan = new File([blob], "converted-pdf.png", { type: "image/png" })
+          const blob = await (await fetch(canvas.toDataURL("image/png"))).blob()
+          fileToScan = new File([blob], "converted.png", { type: "image/png" })
         }
       }
 
       const { Html5Qrcode } = await import("html5-qrcode")
-      
-      const tempDivId = "hidden-reader"
+      const tempDivId = "hidden-barcode-reader"
       let tempDiv = document.getElementById(tempDivId)
       if (!tempDiv) {
-          tempDiv = document.createElement("div")
-          tempDiv.id = tempDivId
-          tempDiv.style.display = "none"
-          document.body.appendChild(tempDiv)
+        tempDiv = document.createElement("div")
+        tempDiv.id = tempDivId
+        tempDiv.style.display = "none"
+        document.body.appendChild(tempDiv)
       }
-
-      const html5QrCode = new Html5Qrcode(tempDivId)
-      const decodedText = await html5QrCode.scanFileV2(fileToScan, false)
-      await handleScanSuccess(decodedText.decodedText)
-      toast.success("Barcode detected from file!")
-    } catch (err) {
-      console.error(err)
-      toast.error("Could not find a valid barcode in that file.")
+      const reader = new Html5Qrcode(tempDivId)
+      const result = await reader.scanFileV2(fileToScan, false)
+      toast.dismiss(toastId)
+      await handleScanSuccess(result.decodedText)
+      toast.success("Barcode detected!")
+    } catch {
+      toast.dismiss(toastId)
+      toast.error("No barcode found in this image. Use 'Attach Prescription' for doctor's notes.")
     } finally {
-        e.target.value = ""
-        toast.dismiss()
+      e.target.value = ""
     }
   }
 
@@ -566,53 +545,84 @@ export default function BillingPage() {
                   </TabsContent>
                   
                   <TabsContent value="scan">
-                    <div className="mt-4 space-y-4">
+                    <div className="mt-4 space-y-3">
                         {!isCameraActive ? (
-                            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl bg-muted/30">
-                                <ScanBarcode className="h-12 w-12 text-muted-foreground mb-4 opacity-50" />
-                                <h3 className="text-sm font-medium mb-4">Camera is Disengaged</h3>
-                                <div className="grid grid-cols-1 w-full gap-3">
-                                    <Button size="lg" className="w-full gap-2 bg-primary" onClick={() => setIsCameraActive(true)}>
-                                        <ScanBarcode className="h-4 w-4" />
-                                        Start Scanning Session
-                                    </Button>
+                            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl bg-muted/30 gap-3">
+                                <ScanBarcode className="h-10 w-10 text-muted-foreground opacity-40" />
+                                <h3 className="text-sm font-medium">Camera Disengaged</h3>
+
+                                {/* Action buttons */}
+                                <div className="grid grid-cols-1 w-full gap-2">
+                                  {/* Camera scan */}
+                                  <Button size="lg" className="w-full gap-2" onClick={() => setIsCameraActive(true)}>
+                                    <ScanBarcode className="h-4 w-4" />
+                                    Start Camera Scan
+                                  </Button>
+
+                                  {/* Barcode from image file */}
+                                  <Button
+                                    variant="outline"
+                                    size="lg"
+                                    className="w-full gap-2 border-dashed"
+                                    onClick={() => barcodeFileInputRef.current?.click()}
+                                  >
+                                    <ImageUp className="h-4 w-4" />
+                                    Scan Barcode from File
+                                  </Button>
+                                  <input
+                                    type="file"
+                                    ref={barcodeFileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleBarcodeFileUpload}
+                                  />
+
+                                  {/* Divider */}
+                                  <div className="flex items-center gap-2 py-1">
+                                    <div className="flex-1 h-px bg-border/50" />
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wide">or</span>
+                                    <div className="flex-1 h-px bg-border/50" />
+                                  </div>
+
+                                  {/* Prescription */}
+                                  {prescriptionUrl ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPrescriptionModalOpen(true)}
+                                      className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 text-xs font-medium w-full hover:bg-green-500/15 transition-colors"
+                                    >
+                                      <FileText className="h-3.5 w-3.5 shrink-0" />
+                                      <span className="flex-1 text-left">Prescription attached — tap to view</span>
+                                      <span className="text-[10px] underline underline-offset-2">Edit</span>
+                                    </button>
+                                  ) : (
                                     <Button
                                       variant="outline"
                                       size="lg"
-                                      className="w-auto gap-2 border-dashed"
-                                      disabled={isUploadingPrescription}
-                                      onClick={() => fileInputRef.current?.click()}
+                                      className="w-full gap-2 border-primary/30 text-primary hover:bg-primary/5"
+                                      onClick={() => setPrescriptionModalOpen(true)}
                                     >
-                                        {isUploadingPrescription
-                                          ? <Loader2 className="h-4 w-4 animate-spin" />
-                                          : <ImageUp className="h-4 w-4" />}
-                                        {isUploadingPrescription ? "Uploading..." : "Upload Prescription / Image"}
+                                      <ClipboardList className="h-4 w-4" />
+                                      Attach Prescription
                                     </Button>
-                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} />
-                                    {/* Prescription attached badge */}
-                                    {prescriptionUrl && (
-                                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 text-xs font-medium">
-                                        <FileText className="h-3.5 w-3.5 shrink-0" />
-                                        <span className="flex-1 truncate">Prescription attached</span>
-                                        <button
-                                          type="button"
-                                          onClick={() => setPrescriptionUrl(null)}
-                                          className="hover:opacity-70 transition-opacity"
-                                          aria-label="Remove prescription"
-                                        >
-                                          <X className="h-3.5 w-3.5" />
-                                        </button>
-                                      </div>
-                                    )}
+                                  )}
                                 </div>
+
+                                {/* Warning: prescription attached but bill empty */}
+                                {prescriptionUrl && billItems.length === 0 && (
+                                  <div className="flex items-start gap-2 w-full px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                                    <span>Prescription attached but no medicines added yet. Search for them in the prescription viewer.</span>
+                                  </div>
+                                )}
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                                 <BarcodeScanner onScanSuccess={handleScanSuccess} onScanFailure={(err) => console.log(err)} />
-                                <Button variant="destructive" className="w-full gap-2 py-6" onClick={() => setIsCameraActive(false)}>
-                                    Stop Camera / Disengage
+                                <Button variant="destructive" className="w-full gap-2 py-5" onClick={() => setIsCameraActive(false)}>
+                                    Stop Camera
                                 </Button>
-                                <p className="text-[10px] text-center text-muted-foreground">The scanner is now live. Point camera at a barcode.</p>
+                                <p className="text-[10px] text-center text-muted-foreground">Scanner is live — point camera at a barcode.</p>
                             </div>
                         )}
                     </div>
@@ -622,6 +632,17 @@ export default function BillingPage() {
             </Card>
           </div>
         </div>
+
+        {/* ── Prescription Modal ────────────────────────────────────────────────── */}
+        <PrescriptionModal
+          open={prescriptionModalOpen}
+          onClose={() => setPrescriptionModalOpen(false)}
+          prescriptionUrl={prescriptionUrl}
+          onPrescriptionUploaded={(url) => setPrescriptionUrl(url)}
+          onPrescriptionRemoved={() => setPrescriptionUrl(null)}
+          onAddToBill={addToBill}
+          billItemIds={new Set(billItems.map(i => i.id))}
+        />
 
         {/* ── Critical Expiry Confirmation Dialog ──────────────────────────────── */}
         <Dialog open={!!criticalProduct} onOpenChange={() => setCriticalProduct(null)}>
