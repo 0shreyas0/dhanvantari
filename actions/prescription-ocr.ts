@@ -42,7 +42,7 @@ export async function extractMedicinesFromPrescription(
     const ai = new GoogleGenAI({ apiKey })
 
     const result = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-1.5-flash",
       contents: [
         {
           role: "user",
@@ -89,6 +89,18 @@ Respond ONLY with a valid JSON array like this (no markdown, no explanation):
     return { success: true, medicines }
   } catch (err: any) {
     console.error("Prescription OCR error:", err)
+
+    // Handle quota / rate-limit errors gracefully
+    const message: string = err.message ?? ""
+    const status: number = err.status ?? err.code ?? 0
+    if (status === 429 || message.includes("429") || message.includes("RESOURCE_EXHAUSTED") || message.includes("quota")) {
+      return {
+        success: false,
+        medicines: [],
+        error: "Gemini API quota exceeded. Please enable billing at aistudio.google.com or try again later. Using manual search instead.",
+      }
+    }
+
     return {
       success: false,
       medicines: [],
