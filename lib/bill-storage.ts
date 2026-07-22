@@ -136,7 +136,8 @@ export async function createBillWithItems(
   userId: string,
   items: { medicineId: string; quantity: number; price: number }[],
   customer?: { name?: string; phone?: string },
-  paymentMethod: string = "Cash"
+  paymentMethod: string = "Cash",
+  prescriptionUrl?: string
 ) {
   const summary = calculateBillSummaryFromItems(items)
 
@@ -147,6 +148,7 @@ export async function createBillWithItems(
         customerName: customer?.name || null,
         customerPhone: customer?.phone || null,
         paymentMethod,
+        prescriptionUrl: prescriptionUrl || null,
         subtotalAmount: summary.subtotalAmount,
         gstRate: summary.gstRate,
         gstAmount: summary.gstAmount,

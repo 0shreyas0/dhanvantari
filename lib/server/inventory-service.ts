@@ -182,7 +182,8 @@ export async function processBillForUser(
   userId: string, 
   items: BillProcessInput[], 
   customer?: CustomerInput, 
-  paymentMethod?: string
+  paymentMethod?: string,
+  prescriptionUrl?: string
 ) {
   const now = new Date()
 
@@ -201,7 +202,7 @@ export async function processBillForUser(
     }
   }
 
-  const bill = await createBillWithItems(userId, items, customer, paymentMethod)
+  const bill = await createBillWithItems(userId, items, customer, paymentMethod, prescriptionUrl)
 
   for (const item of items) {
     let remainingToDeduct = item.quantity

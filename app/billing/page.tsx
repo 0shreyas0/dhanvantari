@@ -13,10 +13,11 @@ import { searchProducts, processBill, getBillDetails } from "@/actions/inventory
 import { sendWhatsAppReceipt } from "@/actions/whatsapp"
 import { sendEmailReceipt } from "@/actions/email"
 import { getExpirySettings } from "@/actions/settings"
-import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download, CreditCard, Banknote, Smartphone } from "lucide-react"
+import { Loader2, Plus, Minus, Trash2, Search, CheckCircle2, Share2, MessageCircle, Send, Mail, ScanBarcode, ImageUp, AlertTriangle, Download, CreditCard, Banknote, Smartphone, FileText, X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { useUploadThing } from "@/lib/uploadthing"
 import {
   Dialog,
   DialogContent,
@@ -76,6 +77,24 @@ export default function BillingPage() {
   const [isCameraActive, setIsCameraActive] = useState(false)
   const [lastCustomerEmail, setLastCustomerEmail] = useState("")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Prescription upload state
+  const [prescriptionUrl, setPrescriptionUrl] = useState<string | null>(null)
+  const [isUploadingPrescription, setIsUploadingPrescription] = useState(false)
+
+  const { startUpload } = useUploadThing("prescriptionUpload", {
+    onUploadBegin: () => setIsUploadingPrescription(true),
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.ufsUrl
+      if (url) setPrescriptionUrl(url)
+      setIsUploadingPrescription(false)
+      toast.success("Prescription uploaded & attached to bill")
+    },
+    onUploadError: (err) => {
+      setIsUploadingPrescription(false)
+      toast.error(err.message || "Prescription upload failed")
+    },
+  })
 
   // Debounce ref for barcode scanner
   const lastScannedRef = useRef<{ code: string; time: number }>({ code: "", time: 0 })
@@ -199,7 +218,12 @@ export default function BillingPage() {
         price: item.price,
       }))
       
-      const result = await processBill(payload as any, { name: customerName, phone: customerPhone }, paymentMethod)
+      const result = await processBill(
+        payload as any,
+        { name: customerName, phone: customerPhone },
+        paymentMethod,
+        prescriptionUrl ?? undefined
+      )
       if (result.success && result.billId) {
         const details = await getBillDetails(result.billId)
         setLastBill(details)
@@ -211,6 +235,7 @@ export default function BillingPage() {
         setCustomerName("")
         setCustomerPhone("")
         setCustomerEmail("")
+        setPrescriptionUrl(null)
         toast.success("Bill processed successfully")
       } else {
         toast.error(result.error || "Failed to process bill.")
@@ -305,6 +330,10 @@ export default function BillingPage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // 1. Upload to UploadThing for persistent storage
+    startUpload([file])
+
+    // 2. Run local barcode scan on the file simultaneously
     toast.loading("Scanning for barcodes...")
     
     try {
@@ -547,11 +576,34 @@ export default function BillingPage() {
                                         <ScanBarcode className="h-4 w-4" />
                                         Start Scanning Session
                                     </Button>
-                                    <Button variant="outline" size="lg" className="w-auto gap-2 border-dashed" onClick={() => fileInputRef.current?.click()}>
-                                        <ImageUp className="h-4 w-4" />
-                                        Upload Image File
+                                    <Button
+                                      variant="outline"
+                                      size="lg"
+                                      className="w-auto gap-2 border-dashed"
+                                      disabled={isUploadingPrescription}
+                                      onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        {isUploadingPrescription
+                                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                                          : <ImageUp className="h-4 w-4" />}
+                                        {isUploadingPrescription ? "Uploading..." : "Upload Prescription / Image"}
                                     </Button>
                                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*,.pdf" onChange={handleFileUpload} />
+                                    {/* Prescription attached badge */}
+                                    {prescriptionUrl && (
+                                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400 text-xs font-medium">
+                                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="flex-1 truncate">Prescription attached</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPrescriptionUrl(null)}
+                                          className="hover:opacity-70 transition-opacity"
+                                          aria-label="Remove prescription"
+                                        >
+                                          <X className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
                                 </div>
                             </div>
                         ) : (
@@ -660,6 +712,13 @@ export default function BillingPage() {
                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-600/30 rounded-md px-3 py-2 mt-1">
                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                    ⚠️ {nearExpiryCount} item{nearExpiryCount > 1 ? "s" : ""} near expiry included in this bill
+                 </div>
+               )}
+               {lastBill?.prescriptionUrl && (
+                 <div className="flex items-center gap-2 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-600/30 rounded-md px-3 py-2 mt-1">
+                   <FileText className="h-3.5 w-3.5 shrink-0" />
+                   <span className="flex-1">Prescription on file —</span>
+                   <a href={lastBill.prescriptionUrl} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 font-medium hover:opacity-70">View</a>
                  </div>
                )}
             </div>

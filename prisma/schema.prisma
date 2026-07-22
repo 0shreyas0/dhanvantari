@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
 }
 
 // 1. Medicines: The core product definitions
@@ -92,7 +92,8 @@ model Bill {
   gstAmount      Float @default(0)
   totalAmount Float
 
-  paymentMethod  String @default("Cash")
+  paymentMethod   String  @default("Cash")
+  prescriptionUrl String? // UploadThing URL of the uploaded prescription (if any)
   createdAt DateTime @default(now())
 }
 

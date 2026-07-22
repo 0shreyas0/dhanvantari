@@ -150,6 +150,9 @@ export async function GET(
       doc.font("ReceiptBold").fontSize(8).fillColor("#94a3b8").text("RECEIPT DETAILS", 350, metaY, { align: "right", width: 195 })
       doc.font("ReceiptBold").fontSize(10).fillColor("#1e293b").text(`ID: #${bill.id.slice(-8).toUpperCase()}`, 350, metaY + 12, { align: "right", width: 195 })
       doc.font("ReceiptRegular").fontSize(10).fillColor("#64748b").text(`Date: ${new Date(bill.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, 350, metaY + 26, { align: "right", width: 195 })
+      // Use "Cash" as fallback for older bills that might have null if schema default didn't apply retrospectively in query
+      const pMethod = (bill as any).paymentMethod || "Cash";
+      doc.font("ReceiptRegular").fontSize(9).fillColor("#64748b").text(`Payment: ${pMethod}`, 350, metaY + 40, { align: "right", width: 195 })
 
       doc.moveDown(3)
 

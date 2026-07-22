@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Loader2, Save, Store, Clock, Upload } from "lucide-react"
 import { getPharmacySettings, updatePharmacySettings, getExpirySettings, updateExpirySettings } from "@/actions/settings"
+ import { useUploadThing } from "@/lib/uploadthing"
 import { toast } from "sonner"
 
 export default function SettingsPage() {
@@ -17,6 +18,20 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [formData, setFormData] = useState({ name: "My Pharmacy", phone: "", address: "", logoUrl: "" })
+
+  const { startUpload } = useUploadThing("pharmacyLogo", {
+    onUploadBegin: () => setIsUploading(true),
+    onClientUploadComplete: (res) => {
+      const url = res?.[0]?.ufsUrl
+      if (url) setFormData(prev => ({ ...prev, logoUrl: url }))
+      setIsUploading(false)
+      toast.success("Logo uploaded — save settings to persist!")
+    },
+    onUploadError: (err) => {
+      setIsUploading(false)
+      toast.error(err.message || "Logo upload failed.")
+    },
+  })
 
   // ── Expiry settings ──────────────────────────────────────────────────────────
   const [isExpiryLoading, setIsExpiryLoading] = useState(true)
@@ -66,31 +81,8 @@ export default function SettingsPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
-    setIsUploading(true)
-    const formData = new FormData()
-    formData.append("logo", file)
-
-    try {
-      const res = await fetch("/api/settings/logo", {
-        method: "POST",
-        body: formData,
-      })
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}))
-        throw new Error(errorData.error || "Upload failed")
-      }
-      const data = await res.json()
-      if (data.logoUrl || data.url) {
-        setFormData(prev => ({ ...prev, logoUrl: data.logoUrl ?? data.url }))
-        toast.success("Logo uploaded and staging — save to persist!")
-      }
-    } catch (err: any) {
-      console.error(err)
-      toast.error(err.message || "Failed to upload image.")
-    } finally {
-      setIsUploading(false)
-    }
+    await startUpload([file])
+    e.target.value = ""
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -221,7 +213,7 @@ export default function SettingsPage() {
                                  </Button>
                                )}
                              </div>
-                             <p className="text-[10px] text-muted-foreground">Upload your store logo. It will be stored securely in Supabase Storage.</p>
+                             <p className="text-[10px] text-muted-foreground">Upload your store logo. It will be stored securely via UploadThing CDN.</p>
                           </div>
                        </div>
                     </div>

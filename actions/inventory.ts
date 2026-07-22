@@ -26,11 +26,12 @@ export async function getMedicineByBarcode(barcode: string) {
 export async function processBill(
   items: { medicineId: string, quantity: number, price: number }[],
   customer?: { name?: string, phone?: string },
-  paymentMethod?: string
+  paymentMethod?: string,
+  prescriptionUrl?: string
 ) {
   const { userId } = await auth()
   if (!userId) throw new Error("Unauthorized")
-  return processBillForUser(userId, items, customer, paymentMethod)
+  return processBillForUser(userId, items, customer, paymentMethod, prescriptionUrl)
 }
 // ...existing code...
 
