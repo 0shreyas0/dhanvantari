@@ -41,24 +41,39 @@ export async function searchProductsForUser(userId: string, query: string) {
     const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     const barcodes = med.batches.map((batch) => batch.barcode).join(" ")
 
-    const availableBatches = med.batches
-      .filter((batch) => batch.quantity > 0)
+    // Separate batches into unexpired (sellable) and expired-but-in-stock
+    const unexpiredBatches = med.batches
+      .filter((batch) => batch.quantity > 0 && batch.expiryDate >= now)
       .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
+
+    const expiredWithStock = med.batches
+      .filter((batch) => batch.quantity > 0 && batch.expiryDate < now)
 
     let isExpired = false
     let isExpiringSoon = false
     let expiryDate: string | null = null
     let daysToExpiry: number | null = null
 
-    if (availableBatches.length > 0) {
-      const nextBatch = availableBatches[0]
+    if (unexpiredBatches.length > 0) {
+      // Use the soonest-expiring unexpired batch (FEFO)
+      const nextBatch = unexpiredBatches[0]
       expiryDate = nextBatch.expiryDate.toISOString()
       daysToExpiry = daysUntil(nextBatch.expiryDate, now)
 
-      if (nextBatch.expiryDate < now) isExpired = true
-      else if (nextBatch.expiryDate <= thirtyDaysFromNow) isExpiringSoon = true
+      if (nextBatch.expiryDate <= thirtyDaysFromNow) isExpiringSoon = true
+    } else if (expiredWithStock.length > 0) {
+      // ALL batches with stock are expired
+      isExpired = true
+      const latestExpired = [...expiredWithStock].sort(
+        (a, b) => b.expiryDate.getTime() - a.expiryDate.getTime()
+      )[0]
+      expiryDate = latestExpired.expiryDate.toISOString()
+      daysToExpiry = daysUntil(latestExpired.expiryDate, now)
     } else if (med.batches.length > 0 && stock === 0) {
-      const lastBatch = [...med.batches].sort((a, b) => b.expiryDate.getTime() - a.expiryDate.getTime())[0]
+      // Out of stock — check if the last batch was expired
+      const lastBatch = [...med.batches].sort(
+        (a, b) => b.expiryDate.getTime() - a.expiryDate.getTime()
+      )[0]
       if (lastBatch.expiryDate < now) {
         isExpired = true
         expiryDate = lastBatch.expiryDate.toISOString()
