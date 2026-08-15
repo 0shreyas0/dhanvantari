@@ -117,6 +117,8 @@ export default function BillingPage() {
   }, [searchQuery])
 
   const handleScanSuccess = async (decodedText: string) => {
+    // Debouncing is already handled by the BarcodeScanner component,
+    // but we still debounce here for image-file scans or external calls.
     const now = Date.now()
     if (decodedText === lastScannedRef.current.code && (now - lastScannedRef.current.time) < 2000) return
     lastScannedRef.current = { code: decodedText, time: now }
@@ -129,9 +131,21 @@ export default function BillingPage() {
         const exactMatch = (results as Product[]).find(p => 
           p.barcodes && p.barcodes.split(" ").some(bc => bc === decodedText)
         )
-        if (exactMatch) addToBill(exactMatch)
-        else setSearchResults(results as Product[])
+        if (exactMatch) {
+          addToBill(exactMatch)
+          toast.success(`Added "${exactMatch.name}" to bill`)
+        } else {
+          // Show fuzzy matches in the search tab
+          setSearchResults(results as Product[])
+          setSearchQuery(decodedText)
+          toast.info(`Found ${results.length} possible match${results.length > 1 ? "es" : ""} — select one below`)
+        }
+      } else {
+        toast.warning(`No products found for barcode: ${decodedText}`)
       }
+    } catch (err) {
+      console.error("Scan lookup failed:", err)
+      toast.error("Failed to look up barcode. Check your internet connection.")
     } finally {
       setIsSearching(false)
     }
