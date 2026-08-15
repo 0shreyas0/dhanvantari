@@ -40,14 +40,16 @@ export default async function ProductsPage() {
     const activeStock = activeBatches.reduce((sum, b) => sum + b.quantity, 0)
     const totalStock = med.batches.reduce((sum, b) => sum + b.quantity, 0)
 
-    // Nearest expiry = earliest across ALL batches with stock > 0 (including recalled)
-    const batchesWithStock = [...med.batches]
-      .filter(b => b.quantity > 0)
+    const now = new Date()
+
+    // Nearest expiry = earliest across unexpired, non-recalled batches with stock > 0
+    const unexpiredWithStock = [...med.batches]
+      .filter(b => b.quantity > 0 && b.expiryDate >= now && !b.isRecalled)
       .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
 
     const expiryDate =
-      batchesWithStock.length > 0
-        ? batchesWithStock[0].expiryDate.toISOString()
+      unexpiredWithStock.length > 0
+        ? unexpiredWithStock[0].expiryDate.toISOString()
         : med.batches.length > 0
         ? [...med.batches].sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())[0].expiryDate.toISOString()
         : null

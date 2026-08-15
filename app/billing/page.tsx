@@ -106,6 +106,9 @@ export default function BillingPage() {
     try {
       const results = await searchProducts(query)
       setSearchResults(results)
+    } catch (err) {
+      console.error("Search failed:", err)
+      toast.error("Failed to search products. Check your connection.")
     } finally {
       setIsSearching(false)
     }
@@ -240,7 +243,7 @@ export default function BillingPage() {
         setPrescriptionUrl(null)
         setPrescriptionModalOpen(false)
         toast.success("Bill processed successfully")
-      } else {
+      } else if (!result.success) {
         toast.error(result.error || "Failed to process bill.")
       }
     } catch (e) {

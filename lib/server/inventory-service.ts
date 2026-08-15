@@ -37,39 +37,47 @@ export async function searchProductsForUser(userId: string, query: string) {
   thirtyDaysFromNow.setDate(now.getDate() + 30)
 
   const formattedMedicines = medicines.map((med) => {
-    const stock = med.batches.reduce((sum, batch) => sum + batch.quantity, 0)
-    const price = med.batches.length > 0 ? med.batches[0].sellingPrice : 0
     const barcodes = med.batches.map((batch) => batch.barcode).join(" ")
 
-    // Separate batches into unexpired (sellable) and expired-but-in-stock
-    const unexpiredBatches = med.batches
-      .filter((batch) => batch.quantity > 0 && batch.expiryDate >= now)
+    // Separate batches into sellable (unexpired, non-recalled, qty > 0) vs rest
+    const sellableBatches = med.batches
+      .filter((batch) => batch.quantity > 0 && batch.expiryDate >= now && !batch.isRecalled)
       .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
 
     const expiredWithStock = med.batches
-      .filter((batch) => batch.quantity > 0 && batch.expiryDate < now)
+      .filter((batch) => batch.quantity > 0 && (batch.expiryDate < now || batch.isRecalled))
+
+    // Bug 2 fix: stock only counts sellable batches
+    const stock = sellableBatches.reduce((sum, batch) => sum + batch.quantity, 0)
+
+    // Bug 1 fix: price from FEFO of sellable batches
+    const price = sellableBatches.length > 0
+      ? sellableBatches[0].sellingPrice
+      : med.batches.length > 0
+        ? med.batches[0].sellingPrice
+        : 0
 
     let isExpired = false
     let isExpiringSoon = false
     let expiryDate: string | null = null
     let daysToExpiry: number | null = null
 
-    if (unexpiredBatches.length > 0) {
-      // Use the soonest-expiring unexpired batch (FEFO)
-      const nextBatch = unexpiredBatches[0]
+    if (sellableBatches.length > 0) {
+      // Use the soonest-expiring sellable batch (FEFO)
+      const nextBatch = sellableBatches[0]
       expiryDate = nextBatch.expiryDate.toISOString()
       daysToExpiry = daysUntil(nextBatch.expiryDate, now)
 
       if (nextBatch.expiryDate <= thirtyDaysFromNow) isExpiringSoon = true
     } else if (expiredWithStock.length > 0) {
-      // ALL batches with stock are expired
+      // ALL batches with stock are expired or recalled
       isExpired = true
       const latestExpired = [...expiredWithStock].sort(
         (a, b) => b.expiryDate.getTime() - a.expiryDate.getTime()
       )[0]
       expiryDate = latestExpired.expiryDate.toISOString()
       daysToExpiry = daysUntil(latestExpired.expiryDate, now)
-    } else if (med.batches.length > 0 && stock === 0) {
+    } else if (med.batches.length > 0) {
       // Out of stock — check if the last batch was expired
       const lastBatch = [...med.batches].sort(
         (a, b) => b.expiryDate.getTime() - a.expiryDate.getTime()
@@ -93,10 +101,18 @@ export async function searchProductsForUser(userId: string, query: string) {
     }
   })
 
+  // Bug 3 fix: Try exact barcode match first before fuzzy search
+  const exactBarcodeMatch = formattedMedicines.filter((m) =>
+    m.barcodes.split(" ").some((bc) => bc === query)
+  )
+  if (exactBarcodeMatch.length > 0) {
+    return exactBarcodeMatch.slice(0, 15)
+  }
+
+  // Fall back to fuzzy name search (barcode weight removed to avoid fuzzy barcode matches)
   const fuse = new Fuse(formattedMedicines, {
     keys: [
-      { name: "name", weight: 0.7 },
-      { name: "barcodes", weight: 0.3 },
+      { name: "name", weight: 1.0 },
     ],
     threshold: 0.4,
     includeScore: true,
@@ -133,13 +149,16 @@ export async function listProductsForUser(userId: string) {
     const activeStock = activeBatches.reduce((sum, batch) => sum + batch.quantity, 0)
     const totalStock = med.batches.reduce((sum, batch) => sum + batch.quantity, 0)
 
-    const batchesWithStock = [...med.batches]
-      .filter((batch) => batch.quantity > 0)
+    const now = new Date()
+
+    // Bug 4 fix: Nearest expiry from unexpired batches with stock, not all batches
+    const unexpiredWithStock = [...med.batches]
+      .filter((batch) => batch.quantity > 0 && batch.expiryDate >= now && !batch.isRecalled)
       .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())
 
     const expiryDate =
-      batchesWithStock.length > 0
-        ? batchesWithStock[0].expiryDate.toISOString()
+      unexpiredWithStock.length > 0
+        ? unexpiredWithStock[0].expiryDate.toISOString()
         : med.batches.length > 0
           ? [...med.batches].sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime())[0].expiryDate.toISOString()
           : null
@@ -202,59 +221,94 @@ export async function processBillForUser(
 ) {
   const now = new Date()
 
-  for (const item of items) {
-    let checkQty = item.quantity
-    const batches = await prisma.batch.findMany({
-      where: { medicineId: item.medicineId, quantity: { gt: 0 } },
-      orderBy: { expiryDate: "asc" },
-    })
-
-    for (const batch of batches) {
-      if (checkQty <= 0) break
-      if (batch.isRecalled) return { success: false as const, error: "SAFETY LOCK: Attempted to sell a RECALLED batch." }
-      if (batch.expiryDate < now) return { success: false as const, error: "SAFETY LOCK: Attempted to sell an EXPIRED batch." }
-      checkQty -= batch.quantity
-    }
-  }
-
-  const bill = await createBillWithItems(userId, items, customer, paymentMethod, prescriptionUrl)
-
-  for (const item of items) {
-    let remainingToDeduct = item.quantity
-    const batches = await prisma.batch.findMany({
-      where: { medicineId: item.medicineId, quantity: { gt: 0 } },
-      orderBy: { expiryDate: "asc" },
-    })
-
-    for (const batch of batches) {
-      if (remainingToDeduct <= 0) break
-
-      const deduct = Math.min(batch.quantity, remainingToDeduct)
-      const serialsToDispense = await prisma.serialNumber.findMany({
-        where: { batchId: batch.id, status: "ACTIVE" },
-        take: deduct,
-      })
-
-      if (serialsToDispense.length > 0) {
-        await prisma.serialNumber.updateMany({
-          where: { id: { in: serialsToDispense.map((serial) => serial.id) } },
-          data: { status: "DISPENSED", dispensedAt: new Date() },
+  // Bug 5 fix: Validate + create bill + deduct stock in a single transaction
+  // to prevent race conditions with concurrent bills.
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // Phase 1: Validate all items have sufficient sellable stock
+      for (const item of items) {
+        let checkQty = item.quantity
+        const batches = await tx.batch.findMany({
+          where: { medicineId: item.medicineId, quantity: { gt: 0 } },
+          orderBy: { expiryDate: "asc" },
         })
+
+        for (const batch of batches) {
+          if (checkQty <= 0) break
+          if (batch.isRecalled) {
+            throw new BillValidationError("SAFETY LOCK: Attempted to sell a RECALLED batch.")
+          }
+          if (batch.expiryDate < now) {
+            // Skip expired batches — don't sell them, but don't block if unexpired stock exists
+            continue
+          }
+          checkQty -= batch.quantity
+        }
+
+        if (checkQty > 0) {
+          throw new BillValidationError(`Insufficient sellable stock for one or more items.`)
+        }
       }
 
-      await prisma.batch.update({
-        where: { id: batch.id },
-        data: { quantity: batch.quantity - deduct },
-      })
+      // Phase 2: Create the bill record
+      const bill = await createBillWithItems(userId, items, customer, paymentMethod, prescriptionUrl)
 
-      remainingToDeduct -= deduct
+      // Phase 3: Deduct stock (FEFO, skip expired/recalled)
+      for (const item of items) {
+        let remainingToDeduct = item.quantity
+        const batches = await tx.batch.findMany({
+          where: { medicineId: item.medicineId, quantity: { gt: 0 } },
+          orderBy: { expiryDate: "asc" },
+        })
+
+        for (const batch of batches) {
+          if (remainingToDeduct <= 0) break
+          // Skip expired or recalled batches during deduction
+          if (batch.isRecalled || batch.expiryDate < now) continue
+
+          const deduct = Math.min(batch.quantity, remainingToDeduct)
+          const serialsToDispense = await tx.serialNumber.findMany({
+            where: { batchId: batch.id, status: "ACTIVE" },
+            take: deduct,
+          })
+
+          if (serialsToDispense.length > 0) {
+            await tx.serialNumber.updateMany({
+              where: { id: { in: serialsToDispense.map((serial) => serial.id) } },
+              data: { status: "DISPENSED", dispensedAt: new Date() },
+            })
+          }
+
+          await tx.batch.update({
+            where: { id: batch.id },
+            data: { quantity: batch.quantity - deduct },
+          })
+
+          remainingToDeduct -= deduct
+        }
+      }
+
+      return {
+        success: true as const,
+        billId: bill.id,
+        pdfUrl: getSignedPdfUrl(bill.id),
+      }
+    })
+
+    return result
+  } catch (error) {
+    if (error instanceof BillValidationError) {
+      return { success: false as const, error: error.message }
     }
+    throw error
   }
+}
 
-  return {
-    success: true as const,
-    billId: bill.id,
-    pdfUrl: getSignedPdfUrl(bill.id),
+/** Typed error for bill validation failures (not unexpected crashes) */
+class BillValidationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = "BillValidationError"
   }
 }
 
